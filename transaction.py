@@ -100,23 +100,6 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         self.roblox_cookies_input.setPlaceholderText("Roblox Cookies")
         layout.addWidget(self.roblox_cookies_input)
 
-        self.timezone_select = QtWidgets.QComboBox(self)
-        self.timezone_select.addItems([
-            "Africa/Abidjan", "Africa/Accra", "Africa/Addis_Ababa", "Africa/Algiers", "Africa/Lagos", "Africa/Nairobi", 
-            "America/Argentina/Buenos_Aires", "America/Argentina/Cordoba", "America/Bogota", "America/Caracas", 
-            "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Mexico_City", "America/New_York", 
-            "America/Port_of_Spain", "America/Sao_Paulo", "Asia/Almaty", "Asia/Bangkok", "Asia/Dhaka", "Asia/Hong_Kong", 
-            "Asia/Islamabad", "Asia/Karachi", "Asia/Kolkata", "Asia/Kuala_Lumpur", "Asia/Manila", "Asia/Nicosia", 
-            "Asia/Seoul", "Asia/Shanghai", "Asia/Singapore", "Asia/Taipei", "Asia/Tokyo", "Australia/Sydney", 
-            "Europe/Amsterdam", "Europe/Andorra", "Europe/Athens", "Europe/Belgrade", "Europe/Berlin", "Europe/Brussels", 
-            "Europe/Bucharest", "Europe/Budapest", "Europe/Copenhagen", "Europe/Dublin", "Europe/Helsinki", "Europe/Lisbon", 
-            "Europe/London", "Europe/Madrid", "Europe/Minsk", "Europe/Paris", "Europe/Prague", "Europe/Rome", "Europe/Sofia", 
-            "Europe/Stockholm", "Europe/Vienna", "Europe/Warsaw", "Europe/Zagreb", "Indian/Maldives", "Indian/Reunion", 
-            "Pacific/Auckland", "Pacific/Fiji", "Pacific/Guam", "Pacific/Honolulu", "Pacific/Majuro", "Pacific/Pago_Pago", 
-            "Pacific/Palau", "Pacific/Port_Moresby", "Pacific/Tarawa", "Pacific/Wellington", "Asia/Dubai", "Africa/Cairo",
-        ])
-        layout.addWidget(self.timezone_select)
-
         # Light/Dark Mode Switch
         self.theme_toggle = QtWidgets.QCheckBox("Dark Mode", self)
         self.theme_toggle.stateChanged.connect(self.toggle_theme)
@@ -126,10 +109,6 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         self.start_button = QtWidgets.QPushButton('Start Monitoring', self)
         self.start_button.clicked.connect(self.start_monitoring)
         layout.addWidget(self.start_button)
-
-        # self.stop_button = QtWidgets.QPushButton('Stop Monitoring', self)
-        # self.stop_button.clicked.connect(self.stop_monitoring)
-        # layout.addWidget(self.stop_button)
 
         # Set layout
         self.setLayout(layout)
@@ -326,15 +305,11 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         self.discord_webhook_url = self.discord_webhook_input.text()
         self.user_id = self.user_id_input.text()
         self.cookies['.ROBLOSECURITY'] = self.roblox_cookies_input.text()
-        selected_timezone = self.timezone_select.currentText()
         
         # Validate required fields
         if not self.discord_webhook_url or not self.user_id or not self.cookies.get('.ROBLOSECURITY'):
             QtWidgets.QMessageBox.warning(self, 'Input Error', 'Please fill in all the fields!')
             return
-        
-        # Set timezone
-        self.timezone = pytz.timezone(selected_timezone)
         
         # Define API URLs
         self.transaction_api_url = f"https://economy.roblox.com/v2/users/{self.user_id}/transaction-totals?timeFrame=Year&transactionType=summary"
@@ -342,6 +317,29 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         
         # Start async monitoring with delay
         self._start_async_monitoring_with_delay()
+
+    async def delay_monitor_start(self, delay_seconds: int):
+        """Adds a delay before starting monitoring."""
+        print(f"Delaying start for {delay_seconds} seconds...")
+        await asyncio.sleep(delay_seconds)  # Non-blocking delay
+
+    def _start_async_monitoring_with_delay(self):
+        """Initialize and start the async loop for monitoring with a delay."""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # Set the delay time in seconds
+            delay_seconds = 3  # Adjust this value to change the delay duration
+            loop.run_until_complete(self.delay_monitor_start(delay_seconds))
+            
+            # Run the monitor after the delay
+            loop.run_in_executor(None, lambda: loop.run_until_complete(self.monitor()))
+            print(f"Monitoring started after {delay_seconds} second delay")
+        
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, 'Monitoring Error', f"An error occurred: {e}")
+            print(f"Error starting async monitoring with delay: {e}")
 
 async def delay_monitor_start(self, delay_seconds: int):
     """Adds a delay before starting monitoring."""
@@ -387,7 +385,7 @@ class RotatingCircle(QtWidgets.QWidget):
 
 def create_splash_screen():
     """Create and return a styled splash screen with animated loading dots."""
-    background_color = QtGui.QColor("#181818")  # Dark background similar to Roblox
+    background_color = QtGui.QColor("#000000")  # Dark background similar to Roblox
     splash_pix = QtGui.QPixmap(download_icon())  # Use the hidden icon file
     splash_pix = splash_pix.scaled(150, 150, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
 
@@ -417,12 +415,10 @@ def create_splash_screen():
             border: none;
             background: #333333;
             height: 5px;
-            border-radius: 3px;
         }
         QProgressBar::chunk {
             background: #00A9E0;  /* Roblox-inspired color */
             width: 10px;
-            border-radius: 3px;
         }
     """)
     layout.addWidget(progress_bar)
