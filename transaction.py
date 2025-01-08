@@ -4,12 +4,11 @@ import asyncio
 import aiohttp
 import platform
 import pytz
-import logging
 import subprocess
 import urllib.request
 from datetime import datetime
 from dotenv import load_dotenv
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5 import QtCore, QtGui, QtWidgets
 from alive_progress import alive_bar
 
@@ -107,9 +106,10 @@ class RobloxMonitorApp(QtWidgets.QWidget):
 
     def init_ui(self):
         """Set up the UI elements."""
-        self.setWindowTitle('Roblox Monitor')
+        self.setWindowTitle('Roblox Transaction Monitor')
         self.setGeometry(200, 200, 600, 400)
-        self.setFixedSize(300, 225)
+        self.setFixedSize(500, 300)
+
         # Set app icon from GitHub image URL or local file
         icon_path = download_icon()  # Download the image
         app_icon = QtGui.QIcon(icon_path)  # Load the icon from the downloaded image
@@ -118,36 +118,58 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         # Create layout and widgets
         layout = QtWidgets.QVBoxLayout()
 
+        self.creditlabel = QtWidgets.QLabel("Roblox Transaction Monitoring App By (MrAndi Scripted)", self)
+        layout.addWidget(self.creditlabel)
+
         self.robux_balance_label = QtWidgets.QLabel("Current Robux Balance: 0", self)
         layout.addWidget(self.robux_balance_label)
 
+        # self.webhook_username = QtWidgets.QLineEdit(self)
+        # self.webhook_username.setPlaceholderText("Soon")
+        # self.webhook_username.setStyleSheet("""
+        #           border-radius: 7px;
+        #           border: 2px solid #808080;
+        # """)
+        # layout.addWidget(self.webhook_username)
+
         self.discord_webhook_input = QtWidgets.QLineEdit(self)
         self.discord_webhook_input.setPlaceholderText("Discord Webhook URL")
+        self.discord_webhook_input.setEchoMode(QtWidgets.QLineEdit.Password)  # Censor input
+        self.discord_webhook_input.setStyleSheet("""
+                  border-radius: 7px;
+                  border: 2px solid #808080;
+        """)
         layout.addWidget(self.discord_webhook_input)
 
         self.user_id_input = QtWidgets.QLineEdit(self)
         self.user_id_input.setPlaceholderText("Roblox User ID")
+        self.user_id_input.setStyleSheet("""
+                  border-radius: 7px;
+                  border: 2px solid #808080;
+        """)
         layout.addWidget(self.user_id_input)
 
         self.roblox_cookies_input = QtWidgets.QLineEdit(self)
-        self.roblox_cookies_input.setPlaceholderText(".ROBLOSECURITY Cookie HERE")
+        self.roblox_cookies_input.setPlaceholderText(".ROBLOSECURITY Cookie Here")
+        self.roblox_cookies_input.setEchoMode(QtWidgets.QLineEdit.Password)  # Censor input
+        self.roblox_cookies_input.setStyleSheet("""
+                  border-radius: 7px;
+                  border: 2px solid #808080;
+        """)
         layout.addWidget(self.roblox_cookies_input)
-
-        # Light/Dark Mode Switch
-        self.theme_toggle = QtWidgets.QCheckBox("Dark Mode", self)
-        self.theme_toggle.stateChanged.connect(self.toggle_theme)
-        layout.addWidget(self.theme_toggle)
 
         # Buttons
         self.start_button = QtWidgets.QPushButton('Start Monitoring', self)
         self.start_button.clicked.connect(self.start_monitoring)
+        self.start_button.setStyleSheet("""
+                  border-radius: 7px;
+                  border: 2px solid #808080;
+        """)
+        self.start_button.setCursor(Qt.PointingHandCursor)
         layout.addWidget(self.start_button)
 
         # Set layout
         self.setLayout(layout)
-
-        # Set default theme
-        self.apply_theme()
 
     def load_json_data(self, filepath, default_data):
         """Load data from a JSON file."""
@@ -164,45 +186,6 @@ class RobloxMonitorApp(QtWidgets.QWidget):
     def get_current_time(self):
         """Get the current time in the specified timezone (12-hour format)."""
         return datetime.now(TIMEZONE).strftime('%m/%d/%Y %I:%M:%S %p')
-
-    def apply_theme(self):
-        """Apply the current theme to the application."""
-        if self.theme_toggle.isChecked():
-            # Dark Mode
-            dark_palette = QtGui.QPalette()
-            dark_palette.setColor(QtGui.QPalette.Window, QtGui.QColor(53, 53, 53))
-            dark_palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
-            dark_palette.setColor(QtGui.QPalette.Base, QtGui.QColor(25, 25, 25))
-            dark_palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(53, 53, 53))
-            dark_palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
-            dark_palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
-            dark_palette.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
-            dark_palette.setColor(QtGui.QPalette.Button, QtGui.QColor(53, 53, 53))
-            dark_palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.black)
-            dark_palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
-            dark_palette.setColor(QtGui.QPalette.Link, QtGui.QColor(53, 53, 53))
-
-            self.setPalette(dark_palette)
-        else:
-            # Light Mode
-            light_palette = QtGui.QPalette()
-            light_palette.setColor(QtGui.QPalette.Window, QtGui.QColor(255, 255, 255))
-            light_palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.black)
-            light_palette.setColor(QtGui.QPalette.Base, QtGui.QColor(255, 255, 255))
-            light_palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(240, 240, 240))
-            light_palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
-            light_palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.black)
-            light_palette.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
-            light_palette.setColor(QtGui.QPalette.Button, QtGui.QColor(240, 240, 240))
-            light_palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.black)
-            light_palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
-            light_palette.setColor(QtGui.QPalette.Link, QtGui.QColor(42, 130, 218))
-
-            self.setPalette(light_palette)
-
-    def toggle_theme(self):
-        """Toggle theme based on the switch state."""
-        self.apply_theme()
 
     async def send_discord_notification(self, embed: dict):
         """Send a notification to the Discord webhook."""
@@ -426,7 +409,7 @@ def create_splash_screen():
     splash_widget = QtWidgets.QWidget()
     splash_widget.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
     splash_widget.setFixedSize(400, 300)  # Smaller, more compact size
-    splash_widget.setStyleSheet(f"background-color: {background_color.name()}; border-radius: 10px;")
+    splash_widget.setStyleSheet(f"background-color: {background_color.name()}")
 
     # Layout setup
     layout = QtWidgets.QVBoxLayout()
