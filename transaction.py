@@ -127,9 +127,9 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         self.start_button.clicked.connect(self.start_monitoring)
         layout.addWidget(self.start_button)
 
-        self.stop_button = QtWidgets.QPushButton('Stop Monitoring', self)
-        self.stop_button.clicked.connect(self.stop_monitoring)
-        layout.addWidget(self.stop_button)
+        # self.stop_button = QtWidgets.QPushButton('Stop Monitoring', self)
+        # self.stop_button.clicked.connect(self.stop_monitoring)
+        # layout.addWidget(self.stop_button)
 
         # Set layout
         self.setLayout(layout)
@@ -296,30 +296,57 @@ class RobloxMonitorApp(QtWidgets.QWidget):
 
                 await asyncio.sleep(UPDATEEVERY)
 
+    async def delay_monitor_start(self, delay_seconds: int):
+        """Adds a delay before starting monitoring."""
+        print(f"Delaying start for {delay_seconds} seconds...")
+        await asyncio.sleep(delay_seconds)  # Non-blocking delay
+
+    def _start_async_monitoring_with_delay(self):
+        """Initialize and start the async loop for monitoring with a delay."""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # Set the delay time in seconds
+            delay_seconds = 3  # Adjust this value to change the delay duration
+            loop.run_until_complete(self.delay_monitor_start(delay_seconds))
+            
+            # Run the monitor after the delay
+            loop.run_in_executor(None, lambda: loop.run_until_complete(self.monitor()))
+            print(f"Monitoring started after {delay_seconds} second delay")
+        
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, 'Monitoring Error', f"An error occurred: {e}")
+            print(f"Error starting async monitoring with delay: {e}")
+
     def start_monitoring(self):
         """Start monitoring in a separate thread to avoid blocking the GUI."""
+        
+        # Retrieve user inputs
         self.discord_webhook_url = self.discord_webhook_input.text()
         self.user_id = self.user_id_input.text()
         self.cookies['.ROBLOSECURITY'] = self.roblox_cookies_input.text()
-
         selected_timezone = self.timezone_select.currentText()
-        self.timezone = pytz.timezone(selected_timezone)
-
-        self.transaction_api_url = f"https://economy.roblox.com/v2/users/{self.user_id}/transaction-totals?timeFrame=Year&transactionType=summary"
-        self.currency_api_url = f"https://economy.roblox.com/v1/users/{self.user_id}/currency"
-
-        if not self.discord_webhook_url or not self.user_id or not self.cookies['.ROBLOSECURITY']:
+        
+        # Validate required fields
+        if not self.discord_webhook_url or not self.user_id or not self.cookies.get('.ROBLOSECURITY'):
             QtWidgets.QMessageBox.warning(self, 'Input Error', 'Please fill in all the fields!')
             return
+        
+        # Set timezone
+        self.timezone = pytz.timezone(selected_timezone)
+        
+        # Define API URLs
+        self.transaction_api_url = f"https://economy.roblox.com/v2/users/{self.user_id}/transaction-totals?timeFrame=Year&transactionType=summary"
+        self.currency_api_url = f"https://economy.roblox.com/v1/users/{self.user_id}/currency"
+        
+        # Start async monitoring with delay
+        self._start_async_monitoring_with_delay()
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.monitor())
-
-    def stop_monitoring(self):
-        """Stop the monitoring process."""
-        self.shutdown_flag = True
-        print("Monitoring stopped.")
+async def delay_monitor_start(self, delay_seconds: int):
+    """Adds a delay before starting monitoring."""
+    print(f"Delaying start for {delay_seconds} seconds...")
+    await asyncio.sleep(delay_seconds)  # Non-blocking delay
 
 class RotatingCircle(QtWidgets.QWidget):
     def __init__(self, parent=None):
