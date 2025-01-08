@@ -44,10 +44,18 @@ else:
 
 def set_hidden_attribute(path):
     """Set the hidden attribute on a file or directory."""
-    if platform.system() == "Windows":
-        # Use `attrib` only if the path exists
-        if os.path.exists(path):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"The specified path does not exist: {path}")
+
+    system = platform.system()
+    try:
+        if system == "Windows":
+            # Use the `attrib` command to set the hidden attribute
             subprocess.run(["attrib", "+H", path], check=True)
+        else:
+            raise RuntimeError(f"Unsupported operating system: {system}")
+    except Exception as e:
+        raise RuntimeError(f"An error occurred while setting the hidden attribute: {e}")
 
 def download_icon():
     """Download the icon to the AppData directory and set it hidden."""
@@ -208,11 +216,9 @@ class RobloxMonitorApp(QtWidgets.QWidget):
             try:
                 async with session.post(self.discord_webhook_url, json=payload, timeout=30) as response:
                     response.raise_for_status()
-                    logging.info("Sent Discord notification successfully.")
+                    print("Sent Discord notification successfully.")
             except aiohttp.ClientError as e:
-                logging.error(f"Error sending Discord notification: {e}")
-            except Exception as e:
-                logging.error(f"Unexpected error occurred while sending Discord notification: {e}")
+                print(f"Error sending Discord notification: {e}")
 
     async def send_discord_notification_for_changes(self, title: str, description: str, changes: dict, footer: str):
         """Send a notification for changes detected in transaction data."""
@@ -230,19 +236,14 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         """Fetch data from the provided URL."""
         retries = 3
         async with aiohttp.ClientSession() as session:
-            for attempt in range(1, retries + 1):
+            for _ in range(retries):
                 try:
-                    logging.info(f"Attempt {attempt}: Fetching data from {url}")
                     async with session.get(url, cookies=self.cookies, timeout=30) as response:
                         response.raise_for_status()
-                        logging.info(f"Successfully fetched data from {url}")
                         return await response.json()
                 except aiohttp.ClientError as e:
-                    logging.warning(f"Attempt {attempt}: Failed to fetch data from {url}: {e}")
+                    print(f"Failed to fetch data from {url}: {e}")
                     await asyncio.sleep(5)
-                except Exception as e:
-                    logging.error(f"Attempt {attempt}: Unexpected error while fetching data from {url}: {e}")
-            logging.error(f"All {retries} attempts to fetch data from {url} failed.")
         return None
 
     async def fetch_transaction_data(self):
@@ -309,35 +310,26 @@ class RobloxMonitorApp(QtWidgets.QWidget):
 
     async def delay_monitor_start(self, delay_seconds: int):
         """Adds a delay before starting monitoring."""
-        logging.info(f"Delaying monitoring start for {delay_seconds} seconds...")
-        try:
-            await asyncio.sleep(delay_seconds)  # Non-blocking delay
-            logging.info("Delay completed. Starting monitoring...")
-        except Exception as e:
-            logging.error(f"An error occurred during delay: {e}")
+        print(f"Delaying start for {delay_seconds} seconds...")
+        await asyncio.sleep(delay_seconds)  # Non-blocking delay
 
     def _start_async_monitoring_with_delay(self):
         """Initialize and start the async loop for monitoring with a delay."""
         try:
-            logging.info("Initializing async monitoring with delay...")
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-
+            
             # Set the delay time in seconds
             delay_seconds = 3  # Adjust this value to change the delay duration
-            logging.info(f"Setting delay of {delay_seconds} seconds before monitoring starts.")
-
-            # Run the delay
             loop.run_until_complete(self.delay_monitor_start(delay_seconds))
-
+            
             # Run the monitor after the delay
             loop.run_in_executor(None, lambda: loop.run_until_complete(self.monitor()))
-            logging.info(f"Monitoring started after a {delay_seconds}-second delay.")
-    
+            print(f"Monitoring started after {delay_seconds} second delay")
+        
         except Exception as e:
-            error_message = f"An error occurred: {e}"
-            logging.error(error_message, exc_info=True)
-            QtWidgets.QMessageBox.critical(self, 'Monitoring Error', error_message)
+            QtWidgets.QMessageBox.critical(self, 'Monitoring Error', f"An error occurred: {e}")
+            print(f"Error starting async monitoring with delay: {e}")
 
     def start_monitoring(self):
         """Start monitoring in a separate thread to avoid blocking the GUI."""
@@ -361,12 +353,8 @@ class RobloxMonitorApp(QtWidgets.QWidget):
 
     async def delay_monitor_start(self, delay_seconds: int):
         """Adds a delay before starting monitoring."""
-        logging.info(f"Delaying monitoring start for {delay_seconds} seconds...")
-        try:
-            await asyncio.sleep(delay_seconds)  # Non-blocking delay
-            logging.info("Delay completed. Starting monitoring...")
-        except Exception as e:
-            logging.error(f"An error occurred during delay: {e}")
+        print(f"Delaying start for {delay_seconds} seconds...")
+        await asyncio.sleep(delay_seconds)  # Non-blocking delay
 
     def _start_async_monitoring_with_delay(self):
         """Initialize and start the async loop for monitoring with a delay."""
@@ -388,12 +376,8 @@ class RobloxMonitorApp(QtWidgets.QWidget):
 
 async def delay_monitor_start(self, delay_seconds: int):
     """Adds a delay before starting monitoring."""
-    logging.info(f"Delaying monitoring start for {delay_seconds} seconds...")
-    try:
-        await asyncio.sleep(delay_seconds)  # Non-blocking delay
-        logging.info("Delay completed. Starting monitoring...")
-    except Exception as e:
-        logging.error(f"An error occurred during delay: {e}", exc_info=True)
+    print(f"Delaying start for {delay_seconds} seconds...")
+    await asyncio.sleep(delay_seconds)  # Non-blocking delay
 
 class RotatingCircle(QtWidgets.QWidget):
     def __init__(self, parent=None):
