@@ -2,13 +2,15 @@ import os
 import json
 import asyncio
 import aiohttp
+import platform
+import pytz
+import subprocess
+import urllib.request
 from datetime import datetime
 from dotenv import load_dotenv
 from PyQt5.QtCore import QTimer
 from PyQt5 import QtCore, QtGui, QtWidgets
 from alive_progress import alive_bar
-import pytz
-import urllib.request
 
 # Load environment variables
 load_dotenv()
@@ -32,25 +34,56 @@ UPDATEEVERY = 60  # Monitor interval
 TIMEZONE = pytz.timezone("America/New_York")  # Default timezone
 shutdown_flag = False  # Graceful shutdown flag
 
-def download_icon():
-    icon_path = os.path.join(hidden_dir, "robux_icon.png")
+# Define the hidden directory path based on the operating system
+home_dir = os.path.expanduser("~")
+if platform.system() == "Windows":
+    appdata_dir = os.path.join(home_dir, "AppData", "Roaming", "HiddenRobux")
+elif platform.system() == "Linux":
+    appdata_dir = os.path.join(home_dir, ".local", "share", "HiddenRobux")
+elif platform.system() == "Darwin":  # macOS
+    appdata_dir = os.path.join(home_dir, "Library", "Application Support", "HiddenRobux")
+else:
+    raise RuntimeError("Unsupported operating system")
 
+def set_hidden_attribute(path):
+    """Set the hidden attribute on a file or directory."""
+    if platform.system() == "Windows":
+        # Use `attrib` only if the path exists
+        if os.path.exists(path):
+            subprocess.run(["attrib", "+H", path], check=True)
+    elif platform.system() in ["Linux", "Darwin"]:  # Linux or macOS
+        # Ensure the path starts with a dot for Linux/macOS
+        base_name = os.path.basename(path)
+        if not base_name.startswith(".") and os.path.exists(path):
+            os.rename(path, os.path.join(os.path.dirname(path), f".{base_name}"))
+
+def download_icon():
+    """Download the icon to the AppData directory and set it hidden."""
+    icon_path = os.path.join(appdata_dir, "robux_icon.png")
+    
     # Ensure the hidden directory exists
-    os.makedirs(hidden_dir, exist_ok=True)
+    os.makedirs(appdata_dir, exist_ok=True)
+
+    # Set the hidden attribute for the directory
+    set_hidden_attribute(appdata_dir)
 
     # Check if the icon already exists
     if not os.path.exists(icon_path):
         urllib.request.urlretrieve(icon_url, icon_path)
 
+        # Set the hidden attribute for the file
+        set_hidden_attribute(icon_path)
+
     return icon_path
 
 def get_hidden_file_path(filename):
-    """Return the path for a hidden file."""
-    hidden_file_path = os.path.join(hidden_dir, filename)
+    """Return the path for a hidden file in the AppData directory."""
+    hidden_file_path = os.path.join(appdata_dir, filename)
     
     # Ensure the hidden directory exists
-    os.makedirs(hidden_dir, exist_ok=True)
-    
+    os.makedirs(appdata_dir, exist_ok=True)
+    set_hidden_attribute(appdata_dir)
+
     return hidden_file_path
 
 # Modify paths for storing JSON files in hidden directory
@@ -97,7 +130,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         layout.addWidget(self.user_id_input)
 
         self.roblox_cookies_input = QtWidgets.QLineEdit(self)
-        self.roblox_cookies_input.setPlaceholderText("Roblox Cookies")
+        self.roblox_cookies_input.setPlaceholderText(".ROBLOSECURITY Cookie HERE")
         layout.addWidget(self.roblox_cookies_input)
 
         # Light/Dark Mode Switch
@@ -473,12 +506,9 @@ def show_splash_screen(app):
     
     splash_widget.close()
 
-def initliate():
+if __name__ == "__main__":
     app = QtWidgets.QApplication([])
     show_splash_screen(app)
     roblox_app = RobloxMonitorApp()
     roblox_app.show()
     app.exec_()
-
-if __name__ == "__main__":
-    initliate()
