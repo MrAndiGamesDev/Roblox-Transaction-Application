@@ -1,20 +1,14 @@
 import os
+import json
 import asyncio
 import aiohttp
-import signal
-import sys
-import json
-import requests
 from datetime import datetime
-import pytz
 from dotenv import load_dotenv
-import tkinter as tk
-from tkinter import messagebox
-from tkinter import PhotoImage
-from threading import Thread
-from PIL import Image, ImageTk
-from io import BytesIO
+from PyQt5.QtCore import QTimer
+from PyQt5 import QtCore, QtGui, QtWidgets
 from alive_progress import alive_bar
+import pytz
+import urllib.request
 
 # Load environment variables
 load_dotenv()
@@ -27,301 +21,441 @@ COOKIES = {}
 TRANSACTION_API_URL = ""
 CURRENCY_API_URL = ""
 
+hidden_dir = ".resources"
+
+# ICON URLS
+icon_url = "https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/Robux.png"
 AVATAR_URL = "https://img.icons8.com/plasticine/2x/robux.png"  # Custom icon for Discord notification
 
 UPDATEEVERY = 60  # Monitor interval
 
-# Timezone setup (default timezone)
-TIMEZONE = pytz.timezone("America/New_York")
+TIMEZONE = pytz.timezone("America/New_York")  # Default timezone
+shutdown_flag = False  # Graceful shutdown flag
 
-# Graceful shutdown flag
-shutdown_flag = False
+def download_icon():
+    icon_path = os.path.join(hidden_dir, "robux_icon.png")
 
-# JSON storage paths
-TRANSACTION_DATA_PATH = "transaction_data.json"
-ROBUX_BALANCE_PATH = "robux_balance.json"
+    # Ensure the hidden directory exists
+    os.makedirs(hidden_dir, exist_ok=True)
 
-def signal_handler(signal, frame):
-    """Handle graceful shutdown."""
-    global shutdown_flag
-    print("Shutting down...")
-    shutdown_flag = True
+    # Check if the icon already exists
+    if not os.path.exists(icon_path):
+        urllib.request.urlretrieve(icon_url, icon_path)
 
-signal.signal(signal.SIGINT, signal_handler)
+    return icon_path
 
-def load_json_data(filepath, default_data):
-    """Load data from a JSON file."""
-    if os.path.exists(filepath):
-        with open(filepath, 'r') as file:
-            return json.load(file)
-    return default_data
+def get_hidden_file_path(filename):
+    """Return the path for a hidden file."""
+    hidden_file_path = os.path.join(hidden_dir, filename)
+    
+    # Ensure the hidden directory exists
+    os.makedirs(hidden_dir, exist_ok=True)
+    
+    return hidden_file_path
 
-def save_json_data(filepath, data):
-    """Save data to a JSON file."""
-    with open(filepath, 'w') as file:
-        json.dump(data, file, indent=4)
+# Modify paths for storing JSON files in hidden directory
+TRANSACTION_DATA_PATH = get_hidden_file_path("transaction_data.json")
+ROBUX_BALANCE_PATH = get_hidden_file_path("robux_balance.json")
 
-def get_current_time():
-    """Get the current time in the specified timezone (12-hour format)."""
-    return datetime.now(TIMEZONE).strftime('%m/%d/%Y %I:%M:%S %p')
+class RobloxMonitorApp(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+        self.discord_webhook_url = ""
+        self.user_id = ""
+        self.cookies = {}
+        self.transaction_api_url = ""
+        self.currency_api_url = ""
+        self.timezone = TIMEZONE
+        self.shutdown_flag = False
+        self.last_transaction_data = self.load_json_data(TRANSACTION_DATA_PATH, {})
+        self.last_robux_balance = self.load_json_data(ROBUX_BALANCE_PATH, {"robux": 0})
 
-async def send_discord_notification(embed: dict):
-    """Send a notification to the Discord webhook."""
-    payload = {
-        "embeds": [embed],
-        "username": "Roblox Transaction Info",
-        "avatar_url": AVATAR_URL
-    }
+        self.init_ui()
 
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.post(DISCORD_WEBHOOK_URL, json=payload, timeout=30) as response:
-                response.raise_for_status()
-                print("Sent Discord notification successfully.")
-        except aiohttp.ClientError as e:
-            print(f"Error sending Discord notification: {e}")
+    def init_ui(self):
+        """Set up the UI elements."""
+        self.setWindowTitle('Roblox Monitor')
+        self.setGeometry(200, 200, 600, 400)
+        self.setFixedSize(300, 225)
+        # Set app icon from GitHub image URL or local file
+        icon_path = download_icon()  # Download the image
+        app_icon = QtGui.QIcon(icon_path)  # Load the icon from the downloaded image
+        self.setWindowIcon(app_icon)  # Set the window icon
 
-async def send_discord_notification_for_changes(title: str, description: str, changes: dict, footer: str):
-    """Send a notification for changes detected in transaction data."""
-    fields = [{"name": key, "value": f"**{old}** → **{new}**", "inline": False} for key, (old, new) in changes.items()]
-    embed = {
-        "title": title,
-        "description": description,
-        "fields": fields,
-        "color": 720640,
-        "footer": {
-            "text": footer
+        # Create layout and widgets
+        layout = QtWidgets.QVBoxLayout()
+
+        self.robux_balance_label = QtWidgets.QLabel("Current Robux Balance: 0", self)
+        layout.addWidget(self.robux_balance_label)
+
+        self.discord_webhook_input = QtWidgets.QLineEdit(self)
+        self.discord_webhook_input.setPlaceholderText("Discord Webhook URL")
+        layout.addWidget(self.discord_webhook_input)
+
+        self.user_id_input = QtWidgets.QLineEdit(self)
+        self.user_id_input.setPlaceholderText("Roblox User ID")
+        layout.addWidget(self.user_id_input)
+
+        self.roblox_cookies_input = QtWidgets.QLineEdit(self)
+        self.roblox_cookies_input.setPlaceholderText("Roblox Cookies")
+        layout.addWidget(self.roblox_cookies_input)
+
+        self.timezone_select = QtWidgets.QComboBox(self)
+        self.timezone_select.addItems([
+            "Africa/Abidjan", "Africa/Accra", "Africa/Addis_Ababa", "Africa/Algiers", "Africa/Lagos", "Africa/Nairobi", 
+            "America/Argentina/Buenos_Aires", "America/Argentina/Cordoba", "America/Bogota", "America/Caracas", 
+            "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Mexico_City", "America/New_York", 
+            "America/Port_of_Spain", "America/Sao_Paulo", "Asia/Almaty", "Asia/Bangkok", "Asia/Dhaka", "Asia/Hong_Kong", 
+            "Asia/Islamabad", "Asia/Karachi", "Asia/Kolkata", "Asia/Kuala_Lumpur", "Asia/Manila", "Asia/Nicosia", 
+            "Asia/Seoul", "Asia/Shanghai", "Asia/Singapore", "Asia/Taipei", "Asia/Tokyo", "Australia/Sydney", 
+            "Europe/Amsterdam", "Europe/Andorra", "Europe/Athens", "Europe/Belgrade", "Europe/Berlin", "Europe/Brussels", 
+            "Europe/Bucharest", "Europe/Budapest", "Europe/Copenhagen", "Europe/Dublin", "Europe/Helsinki", "Europe/Lisbon", 
+            "Europe/London", "Europe/Madrid", "Europe/Minsk", "Europe/Paris", "Europe/Prague", "Europe/Rome", "Europe/Sofia", 
+            "Europe/Stockholm", "Europe/Vienna", "Europe/Warsaw", "Europe/Zagreb", "Indian/Maldives", "Indian/Reunion", 
+            "Pacific/Auckland", "Pacific/Fiji", "Pacific/Guam", "Pacific/Honolulu", "Pacific/Majuro", "Pacific/Pago_Pago", 
+            "Pacific/Palau", "Pacific/Port_Moresby", "Pacific/Tarawa", "Pacific/Wellington", "Asia/Dubai", "Africa/Cairo",
+        ])
+        layout.addWidget(self.timezone_select)
+
+        # Light/Dark Mode Switch
+        self.theme_toggle = QtWidgets.QCheckBox("Dark Mode", self)
+        self.theme_toggle.stateChanged.connect(self.toggle_theme)
+        layout.addWidget(self.theme_toggle)
+
+        # Buttons
+        self.start_button = QtWidgets.QPushButton('Start Monitoring', self)
+        self.start_button.clicked.connect(self.start_monitoring)
+        layout.addWidget(self.start_button)
+
+        self.stop_button = QtWidgets.QPushButton('Stop Monitoring', self)
+        self.stop_button.clicked.connect(self.stop_monitoring)
+        layout.addWidget(self.stop_button)
+
+        # Set layout
+        self.setLayout(layout)
+
+        # Set default theme
+        self.apply_theme()
+
+    def load_json_data(self, filepath, default_data):
+        """Load data from a JSON file."""
+        if os.path.exists(filepath):
+            with open(filepath, 'r') as file:
+                return json.load(file)
+        return default_data
+
+    def save_json_data(self, filepath, data):
+        """Save data to a JSON file."""
+        with open(filepath, 'w') as file:
+            json.dump(data, file, indent=4)
+
+    def get_current_time(self):
+        """Get the current time in the specified timezone (12-hour format)."""
+        return datetime.now(TIMEZONE).strftime('%m/%d/%Y %I:%M:%S %p')
+
+    def apply_theme(self):
+        """Apply the current theme to the application."""
+        if self.theme_toggle.isChecked():
+            # Dark Mode
+            dark_palette = QtGui.QPalette()
+            dark_palette.setColor(QtGui.QPalette.Window, QtGui.QColor(53, 53, 53))
+            dark_palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
+            dark_palette.setColor(QtGui.QPalette.Base, QtGui.QColor(25, 25, 25))
+            dark_palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(53, 53, 53))
+            dark_palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
+            dark_palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
+            dark_palette.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
+            dark_palette.setColor(QtGui.QPalette.Button, QtGui.QColor(53, 53, 53))
+            dark_palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.black)
+            dark_palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
+            dark_palette.setColor(QtGui.QPalette.Link, QtGui.QColor(53, 53, 53))
+
+            self.setPalette(dark_palette)
+        else:
+            # Light Mode
+            light_palette = QtGui.QPalette()
+            light_palette.setColor(QtGui.QPalette.Window, QtGui.QColor(255, 255, 255))
+            light_palette.setColor(QtGui.QPalette.WindowText, QtCore.Qt.black)
+            light_palette.setColor(QtGui.QPalette.Base, QtGui.QColor(255, 255, 255))
+            light_palette.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(240, 240, 240))
+            light_palette.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
+            light_palette.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.black)
+            light_palette.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
+            light_palette.setColor(QtGui.QPalette.Button, QtGui.QColor(240, 240, 240))
+            light_palette.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.black)
+            light_palette.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
+            light_palette.setColor(QtGui.QPalette.Link, QtGui.QColor(42, 130, 218))
+
+            self.setPalette(light_palette)
+
+    def toggle_theme(self):
+        """Toggle theme based on the switch state."""
+        self.apply_theme()
+
+    async def send_discord_notification(self, embed: dict):
+        """Send a notification to the Discord webhook."""
+        payload = {
+            "embeds": [embed],
+            "username": "Roblox Transaction Info",
+            "avatar_url": AVATAR_URL
         }
-    }
-    await send_discord_notification(embed)
 
-async def fetch_data(url: str):
-    """Fetch data from the provided URL."""
-    retries = 3
-    async with aiohttp.ClientSession() as session:
-        for _ in range(retries):
+        async with aiohttp.ClientSession() as session:
             try:
-                async with session.get(url, cookies=COOKIES, timeout=30) as response:
+                async with session.post(self.discord_webhook_url, json=payload, timeout=30) as response:
                     response.raise_for_status()
-                    return await response.json()
+                    print("Sent Discord notification successfully.")
             except aiohttp.ClientError as e:
-                print(f"Failed to fetch data from {url}: {e}")
-                await asyncio.sleep(5)
-    return None
+                print(f"Error sending Discord notification: {e}")
 
-async def fetch_transaction_data():
-    """Fetch transaction data."""
-    return await fetch_data(TRANSACTION_API_URL)
+    async def send_discord_notification_for_changes(self, title: str, description: str, changes: dict, footer: str):
+        """Send a notification for changes detected in transaction data."""
+        fields = [{"name": key, "value": f"**{old}** → **{new}**", "inline": False} for key, (old, new) in changes.items()]
+        embed = {
+            "title": title,
+            "description": description,
+            "fields": fields,
+            "color": 720640,
+            "footer": {"text": footer}
+        }
+        await self.send_discord_notification(embed)
 
+    async def fetch_data(self, url: str):
+        """Fetch data from the provided URL."""
+        retries = 3
+        async with aiohttp.ClientSession() as session:
+            for _ in range(retries):
+                try:
+                    async with session.get(url, cookies=self.cookies, timeout=30) as response:
+                        response.raise_for_status()
+                        return await response.json()
+                except aiohttp.ClientError as e:
+                    print(f"Failed to fetch data from {url}: {e}")
+                    await asyncio.sleep(5)
+        return None
 
-async def fetch_robux_balance():
-    """Fetch the current Robux balance."""
-    response = await fetch_data(CURRENCY_API_URL)
-    return response.get("robux", 0) if response else 0
+    async def fetch_transaction_data(self):
+        """Fetch transaction data."""
+        return await self.fetch_data(self.transaction_api_url)
 
-async def monitor(gui_vars):
-    """Monitor Roblox transaction and Robux data for changes."""
-    last_transaction_data = load_json_data(TRANSACTION_DATA_PATH, {})
-    last_robux_balance = load_json_data(ROBUX_BALANCE_PATH, {"robux": 0})
+    async def fetch_robux_balance(self):
+        """Fetch the current Robux balance."""
+        response = await self.fetch_data(self.currency_api_url)
+        return response.get("robux", 0) if response else 0
 
-    iteration_count = 0
+    async def monitor(self):
+        """Monitor Roblox transaction and Robux data for changes."""
+        iteration_count = 0
 
-    # Using alive_bar with indefinite progress tracking
-    with alive_bar(title="Monitoring Roblox Data", spinner="dots_waves") as bar:
-        while not shutdown_flag:
-            iteration_count += 1
+        with alive_bar(title="Monitoring Roblox Data", spinner="dots_waves") as bar:
+            while not self.shutdown_flag:
+                iteration_count += 1
 
-            # Fetch transaction and balance data concurrently
-            current_transaction_data, current_robux_balance = await asyncio.gather(
-                fetch_transaction_data(),
-                fetch_robux_balance()
-            )
+                current_transaction_data, current_robux_balance = await asyncio.gather(
+                    self.fetch_transaction_data(),
+                    self.fetch_robux_balance()
+                )
 
-            # Update the GUI with the current balance
-            gui_vars["robux_balance"].set(f"Current Robux Balance: {current_robux_balance}")
+                self.robux_balance_label.setText(f"Current Robux Balance: {current_robux_balance}")
 
-            # Check for changes in transaction data
-            if current_transaction_data:
-                changes = {
-                    key: (last_transaction_data.get(key, 0), current_transaction_data[key])
-                    for key in current_transaction_data if current_transaction_data[key] != last_transaction_data.get(key, 0)
-                }
+                if current_transaction_data:
+                    changes = {
+                        key: (self.last_transaction_data.get(key, 0), current_transaction_data[key])
+                        for key in current_transaction_data if current_transaction_data[key] != self.last_transaction_data.get(key, 0)
+                    }
 
-                if changes:
-                    await send_discord_notification_for_changes(
-                        "\U0001F514 Roblox Transaction Data Changed!",
-                        f"Changes detected at {get_current_time()}",
-                        changes,
-                        f"Timestamp: {get_current_time()}"
-                    )
-                    last_transaction_data.update(current_transaction_data)
-                    save_json_data(TRANSACTION_DATA_PATH, last_transaction_data)
+                    if changes:
+                        await self.send_discord_notification_for_changes(
+                            "\U0001F514 Roblox Transaction Data Changed!",
+                            f"Changes detected at {self.get_current_time()}",
+                            changes,
+                            f"Timestamp: {self.get_current_time()}"
+                        )
+                        self.last_transaction_data.update(current_transaction_data)
+                        self.save_json_data(TRANSACTION_DATA_PATH, self.last_transaction_data)
 
-            # Check for changes in Robux balance
-            robux_change = current_robux_balance - last_robux_balance['robux']
-            if robux_change != 0:
-                color = 0x00FF00 if robux_change > 0 else 0xFF0000  # Green for gain, Red for spent
-                change_type = "gained" if robux_change > 0 else "spent"
-                await send_discord_notification({
-                    "title": "\U0001F4B8 Robux Balance Update",
-                    "description": f"You have **{change_type}** Robux.",
-                    "fields": [
-                        {"name": "Previous Balance", "value": f"**{last_robux_balance['robux']}**", "inline": True},
-                        {"name": "Current Balance", "value": f"**{current_robux_balance}**", "inline": True},
-                        {"name": "Change", "value": f"**{'+' if robux_change > 0 else ''}{robux_change}**", "inline": True}
-                    ],
-                    "color": color,
-                    "footer": {"text": f"Change detected at {get_current_time()}"}
-                })
+                robux_change = current_robux_balance - self.last_robux_balance['robux']
+                if robux_change != 0:
+                    color = 0x00FF00 if robux_change > 0 else 0xFF0000  # Green for gain, Red for spent
+                    change_type = "gained" if robux_change > 0 else "spent"
+                    await self.send_discord_notification({
+                        "title": "\U0001F4B8 Robux Balance Update",
+                        "description": f"You have **{change_type}** Robux.",
+                        "fields": [
+                            {"name": "Previous Balance", "value": f"**{self.last_robux_balance['robux']}**", "inline": True},
+                            {"name": "Current Balance", "value": f"**{current_robux_balance}**", "inline": True},
+                            {"name": "Change", "value": f"**{'+' if robux_change > 0 else ''}{robux_change}**", "inline": True}
+                        ],
+                        "color": color,
+                        "footer": {"text": f"Change detected at {self.get_current_time()}"}
+                    })
+                    self.last_robux_balance['robux'] = current_robux_balance
+                    self.save_json_data(ROBUX_BALANCE_PATH, self.last_robux_balance)
 
-                last_robux_balance['robux'] = current_robux_balance
-                save_json_data(ROBUX_BALANCE_PATH, last_robux_balance)
+                bar()
 
-            # Increment alive_bar to show activity
-            bar()
+                await asyncio.sleep(UPDATEEVERY)
 
-            await asyncio.sleep(UPDATEEVERY)
+    def start_monitoring(self):
+        """Start monitoring in a separate thread to avoid blocking the GUI."""
+        self.discord_webhook_url = self.discord_webhook_input.text()
+        self.user_id = self.user_id_input.text()
+        self.cookies['.ROBLOSECURITY'] = self.roblox_cookies_input.text()
 
-def stop_monitoring():
-    """Stop the monitoring process."""
-    global shutdown_flag
-    shutdown_flag = True
-    print("Monitoring stopped.")
+        selected_timezone = self.timezone_select.currentText()
+        self.timezone = pytz.timezone(selected_timezone)
 
-def start_monitoring(gui_vars):
-    """Start monitoring in a separate thread to avoid blocking the GUI.""" 
-    global DISCORD_WEBHOOK_URL, USERID, COOKIES, TRANSACTION_API_URL, CURRENCY_API_URL, TIMEZONE
+        self.transaction_api_url = f"https://economy.roblox.com/v2/users/{self.user_id}/transaction-totals?timeFrame=Year&transactionType=summary"
+        self.currency_api_url = f"https://economy.roblox.com/v1/users/{self.user_id}/currency"
 
-    # Get the values from the input fields
-    DISCORD_WEBHOOK_URL = gui_vars["discord_webhook"].get()
-    USERID = gui_vars["user_id"].get()
-    COOKIES['.ROBLOSECURITY'] = gui_vars["roblox_cookies"].get()
-
-    # Update the selected timezone
-    selected_timezone = gui_vars["timezone"].get()
-    TIMEZONE = pytz.timezone(selected_timezone)
-
-    # Update the API URLs
-    TRANSACTION_API_URL = f"https://economy.roblox.com/v2/users/{USERID}/transaction-totals?timeFrame=Year&transactionType=summary"
-    CURRENCY_API_URL = f"https://economy.roblox.com/v1/users/{USERID}/currency"
-
-    # Validate inputs
-    if not DISCORD_WEBHOOK_URL or not USERID or not COOKIES['.ROBLOSECURITY']:
-        messagebox.showerror("Error", "Please fill in all the fields!")
-        return
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(monitor(gui_vars))
-
-def on_dropdown_click(event, dropdown):
-    """Resize dropdown to smaller width when clicked."""
-    dropdown.config(width=15)  # Set a smaller width when clicked
-
-def on_dropdown_leave(event, dropdown):
-    """Reset dropdown width back to normal when focus is lost."""
-    dropdown.config(width=20)  # Set a larger width when focus is lost
-
-def create_gui():
-    """Create the GUI window and components."""
-    root = tk.Tk()
-    root.title("Roblox Monitoring")
-
-    # Set the app icon from a URL (replace with your GitHub image URL)
-    icon_url = "https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/Robux.png"
-    
-    # Fetch the image data
-    response = requests.get(icon_url, allow_redirects=True)
-
-    # Print response details for debugging
-    print("Status Code:", response.status_code)
-    print("Content Type:", response.headers['Content-Type'])
-
-    if response.status_code == 200 and "image" in response.headers['Content-Type']:
-        icon_data = response.content
-        try:
-            # Open the image using Pillow and convert it to an ImageTk format
-            image = Image.open(BytesIO(icon_data))
-            icon_image = ImageTk.PhotoImage(image)
-
-            # Set the icon to the window
-            root.iconphoto(True, icon_image)
-
-        except Exception as e:
-            print("Error opening image:", e)
-            print("Image data length:", len(icon_data))  # Check if data is received
+        if not self.discord_webhook_url or not self.user_id or not self.cookies['.ROBLOSECURITY']:
+            QtWidgets.QMessageBox.warning(self, 'Input Error', 'Please fill in all the fields!')
             return
-    else:
-        print("Failed to retrieve a valid image. Status code:", response.status_code)
-        return
 
-    gui_vars = {
-        "robux_balance": tk.StringVar(value="Current Robux Balance: 0"),
-        "discord_webhook": tk.StringVar(),
-        "user_id": tk.StringVar(),
-        "roblox_cookies": tk.StringVar(),
-        "timezone": tk.StringVar(value="America/New_York")
-    }
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self.monitor())
 
-    # Discord Webhook input field
-    tk.Label(root, text="Discord Webhook URL").pack(pady=5)
-    discord_webhook_entry = tk.Entry(root, textvariable=gui_vars["discord_webhook"], width=50)
-    discord_webhook_entry.pack(pady=5)
+    def stop_monitoring(self):
+        """Stop the monitoring process."""
+        self.shutdown_flag = True
+        print("Monitoring stopped.")
 
-    # User ID input field
-    tk.Label(root, text="Roblox User ID").pack(pady=5)
-    user_id_entry = tk.Entry(root, textvariable=gui_vars["user_id"], width=50)
-    user_id_entry.pack(pady=5)
+class RotatingCircle(QtWidgets.QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.angle = 0  # Starting angle for the rotation
+        self.setFixedSize(100, 100)  # Set a fixed size for the circle
 
-    # Roblox Cookies input field
-    tk.Label(root, text="Roblox Cookies").pack(pady=5)
-    roblox_cookies_entry = tk.Entry(root, textvariable=gui_vars["roblox_cookies"], width=50)
-    roblox_cookies_entry.pack(pady=5)
+        # Create a timer to update the angle and trigger a repaint
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_angle)
+        self.timer.start(30)  # Update the angle every 30ms (adjust speed here)
 
-    # Timezone dropdown
-    tk.Label(root, text="Select Timezone").pack(pady=5)
-    timezone_options = [
-        "America/New_York", "America/Chicago", "America/Los_Angeles", "America/Denver", 
-        "America/Phoenix", "America/Seattle", "Europe/London", "Europe/Paris", 
-        "Europe/Berlin", "Europe/Moscow", "Asia/Tokyo", "Asia/Singapore", 
-        "Asia/Kolkata", "Asia/Seoul", "Asia/Shanghai", "Asia/Dubai", "Asia/Kuala_Lumpur", 
-        "Australia/Sydney", "Australia/Melbourne", "Australia/Brisbane", "Australia/Perth", 
-        "Africa/Johannesburg", "Africa/Nairobi", "Africa/Cairo", "Africa/Lagos", 
-        "Pacific/Auckland", "Pacific/Fiji", "Pacific/Guam", "Pacific/Honolulu", 
-        "Pacific/Tahiti", "America/Toronto", "America/Vancouver", "America/Edmonton", 
-        "America/Winnipeg", "America/Calgary", "America/Regina", "Asia/Taipei", 
-        "Asia/Manila", "Asia/Hong_Kong", "Europe/Madrid", "Europe/Amsterdam", 
-        "Europe/Stockholm", "America/Sao_Paulo", "America/Argentina/Buenos_Aires", 
-        "America/Montevideo", "America/Caracas", "America/Chile", "America/Lima", 
-        "America/Guayaquil", "Europe/Zurich", "Europe/Oslo", "Europe/Brussels", 
-        "Europe/Athens", "Europe/Rome", "Europe/Prague", "Asia/Ho_Chi_Minh"
-    ]
-    timezone_dropdown = tk.OptionMenu(root, gui_vars["timezone"], *timezone_options)
-    timezone_dropdown.config(width=20)  # Set initial width
+    def update_angle(self):
+        """Update the rotation angle."""
+        self.angle += 5  # Increment angle by 5 degrees
+        if self.angle >= 360:
+            self.angle = 0  # Reset the angle once it completes a full circle
+        self.update()  # Request a repaint
+
+    def paintEvent(self, event):
+        """Draw the rotating circle."""
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)  # Smooth rendering
+        painter.setPen(QtCore.Qt.NoPen)  # No border for the circle
+        painter.setBrush(QtGui.QColor(0, 169, 224))  # Set the fill color (Roblox-like)
+
+        # Calculate the center and radius of the circle
+        center = self.rect().center()
+        radius = self.width() // 3  # Set the radius as a third of the widget size
+
+        # Rotate the painter around the center of the circle
+        painter.translate(center)
+        painter.rotate(self.angle)
+        painter.translate(-center)
+
+        # Draw the circle
+        painter.drawEllipse(center, radius, radius)
+
+def create_splash_screen():
+    """Create and return a styled splash screen with animated loading dots."""
+    background_color = QtGui.QColor("#181818")  # Dark background similar to Roblox
+    splash_pix = QtGui.QPixmap(download_icon())  # Use the hidden icon file
+    splash_pix = splash_pix.scaled(150, 150, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+
+    # Create main splash window widget
+    splash_widget = QtWidgets.QWidget()
+    splash_widget.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
+    splash_widget.setFixedSize(400, 300)  # Smaller, more compact size
+    splash_widget.setStyleSheet(f"background-color: {background_color.name()}; border-radius: 10px;")
+
+    # Layout setup
+    layout = QtWidgets.QVBoxLayout()
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(15)
+
+    # Logo with smooth scaling
+    logo_label = QtWidgets.QLabel()
+    logo_label.setPixmap(splash_pix)
+    logo_label.setAlignment(QtCore.Qt.AlignCenter)
+    layout.addWidget(logo_label)
+
+    # Create progress bar with subtle animation and modern look
+    progress_bar = QtWidgets.QProgressBar()
+    progress_bar.setRange(0, 100)
+    progress_bar.setTextVisible(False)
+    progress_bar.setStyleSheet("""
+        QProgressBar {
+            border: none;
+            background: #333333;
+            height: 5px;
+            border-radius: 3px;
+        }
+        QProgressBar::chunk {
+            background: #00A9E0;  /* Roblox-inspired color */
+            width: 10px;
+            border-radius: 3px;
+        }
+    """)
+    layout.addWidget(progress_bar)
+
+    # Loading message with modern font style
+    loading_message = QtWidgets.QLabel("Initializing Roblox Monitor...")
+    loading_message.setAlignment(QtCore.Qt.AlignCenter)
+    loading_message.setStyleSheet("color: white; font-size: 16px; font-family: 'Segoe UI', sans-serif;")
+    layout.addWidget(loading_message)
+
+    # Set the layout for the splash widget
+    splash_widget.setLayout(layout)
+
+    return splash_widget, progress_bar, loading_message
+
+def animate_loading_dots(loading_message):
+    """Animate loading dots for the loading message."""
+    dots = ""
+    def update_message():
+        nonlocal dots
+        dots = "." * (dots.count(".") % 3 + 1)
+        loading_message.setText(f"Initializing Roblox Monitor{dots}")
     
-    # Bind events to change dropdown width on click and leave
-    timezone_dropdown.bind("<Enter>", lambda event: on_dropdown_click(event, timezone_dropdown))
-    timezone_dropdown.bind("<Leave>", lambda event: on_dropdown_leave(event, timezone_dropdown))
+    # Set up a timer to update the loading message
+    timer = QTimer()
+    timer.timeout.connect(update_message)
+    timer.start(1000)  # Update every 500 milliseconds
+    
+    return timer
 
-    timezone_dropdown.pack(pady=5)
+def show_splash_screen(app):
+    """Show a splash screen with a Roblox-like loading bar, animated dots, and logo."""
+    splash_widget, progress_bar, loading_message = create_splash_screen()
 
-    # Robux balance label
-    robux_label = tk.Label(root, textvariable=gui_vars["robux_balance"], font=("Arial", 14))
-    robux_label.pack(pady=20)
+    splash_widget.show()
 
-    # Start button
-    start_button = tk.Button(root, text="Start Monitoring", command=lambda: Thread(target=start_monitoring, args=(gui_vars,)).start())
-    start_button.pack(pady=10)
+    # Animate loading dots
+    timer = animate_loading_dots(loading_message)
 
-    # Stop button
-    stop_button = tk.Button(root, text="Stop Monitoring", command=stop_monitoring)
-    stop_button.pack(pady=10)
+    # Simulate the loading process, updating the progress bar
+    for i in range(101):
+        app.processEvents()
+        progress_bar.setValue(i)
+        QtCore.QThread.msleep(69)  # Control the speed of progress bar update
 
-    root.mainloop()
+        # Update the loading message with dynamic dots every 2% progress
+        if i % 2 == 0:
+            loading_message.setText(f"Initializing Roblox Monitor{'...' * (i % 3 + 1)}")
+
+    # Stop the timer once the splash screen is finished
+    timer.stop()
+    
+    splash_widget.close()
+
+def initliate():
+    app = QtWidgets.QApplication([])
+    show_splash_screen(app)
+    roblox_app = RobloxMonitorApp()
+    roblox_app.show()
+    app.exec_()
 
 if __name__ == "__main__":
-    try:
-        create_gui()
-    except KeyboardInterrupt:
-        print("Script interrupted by user. Exiting...")
-        sys.exit(0)
+    initliate()
