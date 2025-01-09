@@ -31,7 +31,10 @@ Supported = "Windows"
 
 # ICON URLS
 icon_url = "https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/Robux.png"
+background_image = ""
 AVATAR_URL = "" # Custom icon for Discord notification
+
+VERSION = "V0.6.3"
 
 UPDATEEVERY = 60  # Monitor interval
 
@@ -41,7 +44,7 @@ shutdown_flag = False  # Graceful shutdown flag
 # Define the hidden directory path based on the operating system
 home_dir = os.path.expanduser("~")
 
-#https://img.icons8.com/plasticine/2x/robux.png
+# https://img.icons8.com/plasticine/2x/robux.png
 
 def show_popup(message, title="Error"):
     """Display a custom popup with the specified message using PyQt5."""
@@ -132,23 +135,37 @@ class RobloxMonitorApp(QtWidgets.QWidget):
 
     def init_ui(self):
         """Set up the UI elements."""
-        self.setWindowTitle('Welcome To Roblox Transaction Monitor')
+        self.setWindowTitle(f'Welcome To Roblox Transaction Monitor {VERSION}')
         self.setGeometry(200, 200, 600, 400)
-        self.setFixedSize(500, 300)
+        self.setFixedSize(600, 500)
 
         # Set app icon from GitHub image URL or local file
         icon_path = download_icon()  # Download the image
         app_icon = QtGui.QIcon(icon_path)  # Load the icon from the downloaded image
         self.setWindowIcon(app_icon)  # Set the window icon
 
-        # Create layout and widgets
         layout = QtWidgets.QVBoxLayout()
 
-        self.creditlabel = QtWidgets.QLabel("Roblox Transaction Monitoring App By (MrAndi Scripted)", self)
+        self.creditlabel = QtWidgets.QLabel("Roblox Transaction Monitoring App", self)
         layout.addWidget(self.creditlabel)
 
         self.robux_balance_label = QtWidgets.QLabel("Current Robux Balance: 0", self)
         layout.addWidget(self.robux_balance_label)
+
+        # GUI Logs with Credits
+        self.gui_logs = QtWidgets.QTextEdit(self)
+        self.gui_logs.setReadOnly(True)
+        self.gui_logs.setStyleSheet("""
+            border-radius: 10px;  /* Set corner radius */
+            border: 2px solid #808080;
+            background-color: #f9f9f9;  /* Optional: Add a subtle background color */
+            padding: 5px;  /* Optional: Add padding for better text alignment */
+        """)
+        self.gui_logs.setFixedHeight(150)  # Adjust height to make it larger
+        layout.addWidget(self.gui_logs)
+
+        # Add credits to the logs
+        self.add_credits_to_logs()
 
         self.discord_webhook_username_input = QtWidgets.QLineEdit(self)
         self.discord_webhook_username_input.setPlaceholderText("Discord Webhook Username")
@@ -168,7 +185,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         layout.addWidget(self.discord_webhook_input)
 
         self.image_url = QtWidgets.QLineEdit(self)
-        self.image_url.setPlaceholderText("Image URL")
+        self.image_url.setPlaceholderText("Any Image URL")
         self.image_url.setStyleSheet("""
                   border-radius: 7px;
                   border: 2px solid #808080;
@@ -304,6 +321,16 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         # Set layout
         self.setLayout(layout)
 
+    def add_credits_to_logs(self):
+        """Add credits to the GUI logs."""
+        credits_text = (
+            "Credits:\n"
+            "Komas19 (For Sending Me This Source Code)\n"
+            "MrAndi Scripted (For Modifing The Source Code To Make An Gui Application)\n"
+            "Developed Using: Framework (PyQt5 for Python)\n"
+        )
+        self.gui_logs.append(credits_text)
+
     def load_json_data(self, filepath, default_data):
         """Load data from a JSON file."""
         if os.path.exists(filepath):
@@ -316,14 +343,35 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         with open(filepath, 'w') as file:
             json.dump(data, file, indent=4)
 
-    async def send_discord_notification(self, embed: dict):
+    async def fetch_avatar_thumbnail(self, user_id):
+        """Fetches the avatar thumbnail for a given user from Roblox's API."""
+        avatar_url = f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=150x150&format=Png"
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(avatar_url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data['data'][0]['imageUrl']  # Returns the image URL
+                else:
+                    return None  # If the request fails
+
+    def get_current_time(self, timezone=None):
+        """Get the current time in the specified timezone (12-hour format)."""
+        tz = timezone or self.get_selected_timezone()
+        return datetime.now(tz).strftime('%m/%d/%Y %I:%M:%S %p')
+
+    def get_selected_timezone(self):
+        """Get the selected timezone from the dropdown."""
+        selected_timezone = self.timezone_dropdown.currentText()
+        return pytz.timezone(selected_timezone)
+
+    async def send_discord_notification(self, embed: dict, avatar_url: str = None):
         """Send a notification to the Discord webhook."""
-        AVATAR_URL = self.image_url.text()
-        USERNAMES = self.discord_webhook_username_input.text()
+        USERNAMES = self.discord_webhook_username_input.text()  # Assuming this is a GUI input element
         payload = {
             "embeds": [embed],
             "username": USERNAMES,
-            "avatar_url": AVATAR_URL
+            "avatar_url": self.image_url.text()
         }
 
         async with aiohttp.ClientSession() as session:
@@ -334,13 +382,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
             except aiohttp.ClientError as e:
                 print(f"Error sending Discord notification: {e}")
 
-    def get_current_time(self, timezone=None):
-        """Get the current time in the specified timezone (12-hour format)."""
-        # Use the provided timezone or default to the application's timezone
-        tz = timezone or self.get_selected_timezone()
-        return datetime.now(tz).strftime('%m/%d/%Y %I:%M:%S %p')
-
-    async def send_discord_notification_for_changes(self, title: str, description: str, changes: dict, footer: str):
+    async def send_discord_notification_for_changes(self, title: str, description: str, changes: dict, footer: str, avatar_url: str):
         """Send a notification for changes detected in transaction data."""
         fields = [{"name": key, "value": f"**{old}** → **{new}**", "inline": False} for key, (old, new) in changes.items()]
         
@@ -354,7 +396,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
             "color": 720640,
             "footer": {"text": f"{footer} | Timezone: {self.get_selected_timezone().zone} | Time: {current_time_in_timezone}"}
         }
-        await self.send_discord_notification(embed)
+        await self.send_discord_notification(embed, avatar_url)
 
     async def fetch_data(self, url: str):
         """Fetch data from the provided URL."""
@@ -379,14 +421,11 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         response = await self.fetch_data(self.currency_api_url)
         return response.get("robux", 0) if response else 0
 
-    def get_selected_timezone(self):
-        """Get the selected timezone from the dropdown."""
-        selected_timezone = self.timezone_dropdown.currentText()
-        return pytz.timezone(selected_timezone)
-
     async def monitor(self):
         """Monitor Roblox transaction and Robux data for changes."""
         iteration_count = 0
+        USER_ID = self.user_id_input.text()  # Replace with actual user ID for avatar
+        AVATAR_URL = await self.fetch_avatar_thumbnail(USER_ID)
 
         with alive_bar(title="Monitoring Roblox Data", spinner="dots_waves") as bar:
             while not self.shutdown_flag:
@@ -410,7 +449,8 @@ class RobloxMonitorApp(QtWidgets.QWidget):
                             "\U0001F514 Roblox Transaction Data Changed!",
                             f"Changes detected at {self.get_current_time()}",
                             changes,
-                            "Fetched From Roblox's API"
+                            "Fetched From Roblox's API",
+                            avatar_url=AVATAR_URL  # Adding the avatar to the notification
                         )
                         self.last_transaction_data.update(current_transaction_data)
                         self.save_json_data(TRANSACTION_DATA_PATH, self.last_transaction_data)
@@ -428,7 +468,8 @@ class RobloxMonitorApp(QtWidgets.QWidget):
                             {"name": "Change", "value": f"**{'+' if robux_change > 0 else ''}{robux_change}**", "inline": True}
                         ],
                         "color": color,
-                        "footer": {"text": f"Change detected at {self.get_current_time()}"}
+                        "footer": {"text": f"Change detected at {self.get_current_time()}"},
+                        "thumbnail": {"url": AVATAR_URL},  # Add Roblox icon as a thumbnail
                     })
                     self.last_robux_balance['robux'] = current_robux_balance
                     self.save_json_data(ROBUX_BALANCE_PATH, self.last_robux_balance)
@@ -471,7 +512,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         
         # Validate required fields
         if not self.discord_webhook_url or not self.user_id or not self.cookies.get('.ROBLOSECURITY') or not self.dcusernameinput:
-            QtWidgets.QMessageBox.warning(self, 'Input Error', 'Please fill in all the fields!')
+            QtWidgets.QMessageBox.warning(self, 'Input Error', 'Please fill in some of the fields!')
             return
         
         # Define API URLs
@@ -493,7 +534,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
             asyncio.set_event_loop(loop)
             
             # Set the delay time in seconds
-            delay_seconds = 3  # Adjust this value to change the delay duration
+            delay_seconds = 3 # Adjust this value to change the delay duration
             loop.run_until_complete(self.delay_monitor_start(delay_seconds))
             
             # Run the monitor after the delay
@@ -678,7 +719,7 @@ def animate_loading_dots(loading_message):
     # Set up a timer to update the loading message
     timer = QTimer()
     timer.timeout.connect(update_message)
-    timer.start(1000)  # Update every 500 milliseconds
+    timer.start(1000)  # Update every 1000 milliseconds
     
     return timer
 
@@ -692,7 +733,7 @@ def show_splash_screen(app):
     timer = animate_loading_dots(loading_message)
 
     # Simulate the loading process, updating the progress bar
-    for i in range(101):
+    for i in range(100):
         app.processEvents()
         progress_bar.setValue(i)
         QtCore.QThread.msleep(60)  # Control the speed of progress bar update
