@@ -150,6 +150,14 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         self.robux_balance_label = QtWidgets.QLabel("Current Robux Balance: 0", self)
         layout.addWidget(self.robux_balance_label)
 
+        self.discord_webhook_username_input = QtWidgets.QLineEdit(self)
+        self.discord_webhook_username_input.setPlaceholderText("Discord Webhook Username")
+        self.discord_webhook_username_input.setStyleSheet("""
+                  border-radius: 7px;
+                  border: 2px solid #808080;
+        """)
+        layout.addWidget(self.discord_webhook_username_input)
+
         self.discord_webhook_input = QtWidgets.QLineEdit(self)
         self.discord_webhook_input.setPlaceholderText("Discord Webhook URL")
         self.discord_webhook_input.setEchoMode(QtWidgets.QLineEdit.Password)  # Censor input
@@ -311,9 +319,10 @@ class RobloxMonitorApp(QtWidgets.QWidget):
     async def send_discord_notification(self, embed: dict):
         """Send a notification to the Discord webhook."""
         AVATAR_URL = self.image_url.text()
+        USERNAMES = self.discord_webhook_username_input.text()
         payload = {
             "embeds": [embed],
-            "username": "Roblox Transaction Info",
+            "username": USERNAMES,
             "avatar_url": AVATAR_URL
         }
 
@@ -343,7 +352,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
             "description": description,
             "fields": fields,
             "color": 720640,
-            "footer": {"text": f"{footer} Timezone: {self.get_selected_timezone().zone} | Time: {current_time_in_timezone}"}
+            "footer": {"text": f"{footer} | Timezone: {self.get_selected_timezone().zone} | Time: {current_time_in_timezone}"}
         }
         await self.send_discord_notification(embed)
 
@@ -458,9 +467,10 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         self.discord_webhook_url = self.discord_webhook_input.text()
         self.user_id = self.user_id_input.text()
         self.cookies['.ROBLOSECURITY'] = self.roblox_cookies_input.text()
+        self.dcusernameinput = self.discord_webhook_username_input.text()
         
         # Validate required fields
-        if not self.discord_webhook_url or not self.user_id or not self.cookies.get('.ROBLOSECURITY'):
+        if not self.discord_webhook_url or not self.user_id or not self.cookies.get('.ROBLOSECURITY') or not self.dcusernameinput:
             QtWidgets.QMessageBox.warning(self, 'Input Error', 'Please fill in all the fields!')
             return
         
