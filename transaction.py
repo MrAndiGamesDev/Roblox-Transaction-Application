@@ -399,6 +399,75 @@ class RotatingCircle(QtWidgets.QWidget):
         # Draw the circle
         painter.drawEllipse(center, radius, radius)
 
+class LoginWindow(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("Login to Roblox Monitor")
+        self.setGeometry(100, 100, 400, 200)
+
+        icon_path = download_icon()  # Download the image
+        app_icon = QtGui.QIcon(icon_path)  # Load the icon from the downloaded image
+        self.setWindowIcon(app_icon)  # Set the window icon
+
+        # Create layout
+        layout = QtWidgets.QVBoxLayout()
+
+        # Username field
+        self.username_label = QtWidgets.QLabel("Username:")
+        self.username_input = QtWidgets.QLineEdit()
+        self.username_input.setStyleSheet("""
+                  border-radius: 7px;
+                  border: 2px solid #808080;
+        """)
+        layout.addWidget(self.username_label)
+        layout.addWidget(self.username_input)
+
+        # Password field
+        self.password_label = QtWidgets.QLabel("Password:")
+        self.password_input = QtWidgets.QLineEdit()
+        self.password_input.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.password_input.setStyleSheet("""
+                  border-radius: 7px;
+                  border: 2px solid #808080;
+        """)
+        layout.addWidget(self.password_label)
+        layout.addWidget(self.password_input)
+
+        # Login button
+        self.login_button = QtWidgets.QPushButton("Login")
+        self.login_button.clicked.connect(self.handle_login)
+        self.login_button.setStyleSheet("""
+                  border-radius: 7px;
+                  border: 2px solid #808080;
+        """)
+        layout.addWidget(self.login_button)
+
+        # Status label
+        self.status_label = QtWidgets.QLabel()
+        layout.addWidget(self.status_label)
+
+        self.setLayout(layout)
+
+    def launch_main_app(self):
+        self.main_app = RobloxMonitorApp()
+        self.main_app.show()
+
+    def authenticate(self, username, password):
+        # Replace with actual authentication logic
+        return username == "admin" and password == "password"
+
+    def handle_login(self):
+        username = self.username_input.text()
+        password = self.password_input.text()
+
+        if self.authenticate(username, password):
+            self.status_label.setText("Login successful!")
+            self.close()
+            self.launch_main_app()
+        else:
+            self.status_label.setText("Invalid credentials. Please try again.")
+
 def create_splash_screen():
     """Create and return a styled splash screen with animated loading dots."""
     background_color = QtGui.QColor("#000000")  # Dark background similar to Roblox
@@ -492,6 +561,6 @@ def show_splash_screen(app):
 if __name__ == "__main__":
     app = QtWidgets.QApplication([])
     show_splash_screen(app)
-    roblox_app = RobloxMonitorApp()
-    roblox_app.show()
+    login_window = LoginWindow()
+    login_window.show()
     app.exec_()
