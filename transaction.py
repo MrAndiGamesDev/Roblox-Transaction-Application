@@ -6,10 +6,13 @@ import platform
 import pytz
 import subprocess
 import urllib.request
+import sys
+import time
 from datetime import datetime
 from dotenv import load_dotenv
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QApplication, QMessageBox
 from alive_progress import alive_bar
 
 # Load environment variables
@@ -24,10 +27,11 @@ TRANSACTION_API_URL = ""
 CURRENCY_API_URL = ""
 
 hidden_dir = ".resources"
+Supported = "Windows"
 
 # ICON URLS
 icon_url = "https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/Robux.png"
-AVATAR_URL = "https://img.icons8.com/plasticine/2x/robux.png"  # Custom icon for Discord notification
+AVATAR_URL = "" # Custom icon for Discord notification
 
 UPDATEEVERY = 60  # Monitor interval
 
@@ -36,25 +40,47 @@ shutdown_flag = False  # Graceful shutdown flag
 
 # Define the hidden directory path based on the operating system
 home_dir = os.path.expanduser("~")
-if platform.system() == "Windows":
-    appdata_dir = os.path.join(home_dir, "AppData", "Roaming", "HiddenRobux")
-else:
-    raise RuntimeError("Unsupported operating system")
+
+#https://img.icons8.com/plasticine/2x/robux.png
+
+def show_popup(message, title="Error"):
+    """Display a custom popup with the specified message using PyQt5."""
+    app = QApplication([])
+    msg_box = QMessageBox()
+    msg_box.setIcon(QMessageBox.Critical)
+    msg_box.setWindowTitle(title)
+    msg_box.setText(message)
+    msg_box.exec_()
 
 def set_hidden_attribute(path):
     """Set the hidden attribute on a file or directory."""
     if not os.path.exists(path):
+        show_popup(f"The specified path does not exist: {path}")
         raise FileNotFoundError(f"The specified path does not exist: {path}")
 
     system = platform.system()
     try:
-        if system == "Windows":
+        if system == Supported:
             # Use the `attrib` command to set the hidden attribute
             subprocess.run(["attrib", "+H", path], check=True)
         else:
+            show_popup(f"Unsupported operating system: {system}")
             raise RuntimeError(f"Unsupported operating system: {system}")
     except Exception as e:
+        show_popup(f"An error occurred while setting the hidden attribute: {e}")
         raise RuntimeError(f"An error occurred while setting the hidden attribute: {e}")
+
+if platform.system() == Supported:
+    appdata_dir = os.path.join(home_dir, "AppData", "Roaming", "HiddenRobux")
+    
+    # Example usage
+    try:
+        os.makedirs(appdata_dir, exist_ok=True)  # Ensure the directory exists
+        set_hidden_attribute(appdata_dir)
+    except Exception as e:
+        print(f"Error: {e}")
+else:
+    show_popup("Unsupported operating system")
 
 def download_icon():
     """Download the icon to the AppData directory and set it hidden."""
@@ -106,7 +132,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
 
     def init_ui(self):
         """Set up the UI elements."""
-        self.setWindowTitle('Roblox Transaction Monitor')
+        self.setWindowTitle('Welcome To Roblox Transaction Monitor')
         self.setGeometry(200, 200, 600, 400)
         self.setFixedSize(500, 300)
 
@@ -124,14 +150,6 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         self.robux_balance_label = QtWidgets.QLabel("Current Robux Balance: 0", self)
         layout.addWidget(self.robux_balance_label)
 
-        # self.webhook_username = QtWidgets.QLineEdit(self)
-        # self.webhook_username.setPlaceholderText("Soon")
-        # self.webhook_username.setStyleSheet("""
-        #           border-radius: 7px;
-        #           border: 2px solid #808080;
-        # """)
-        # layout.addWidget(self.webhook_username)
-
         self.discord_webhook_input = QtWidgets.QLineEdit(self)
         self.discord_webhook_input.setPlaceholderText("Discord Webhook URL")
         self.discord_webhook_input.setEchoMode(QtWidgets.QLineEdit.Password)  # Censor input
@@ -140,6 +158,14 @@ class RobloxMonitorApp(QtWidgets.QWidget):
                   border: 2px solid #808080;
         """)
         layout.addWidget(self.discord_webhook_input)
+
+        self.image_url = QtWidgets.QLineEdit(self)
+        self.image_url.setPlaceholderText("Image URL")
+        self.image_url.setStyleSheet("""
+                  border-radius: 7px;
+                  border: 2px solid #808080;
+        """)
+        layout.addWidget(self.image_url)
 
         self.user_id_input = QtWidgets.QLineEdit(self)
         self.user_id_input.setPlaceholderText("Roblox User ID")
@@ -157,6 +183,105 @@ class RobloxMonitorApp(QtWidgets.QWidget):
                   border: 2px solid #808080;
         """)
         layout.addWidget(self.roblox_cookies_input)
+
+        # Timezone dropdown menu
+        self.timezone_dropdown = QtWidgets.QComboBox(self)
+        self.timezone_dropdown.addItems([
+            "UTC",
+            # North America
+            "America/New_York", 
+            "America/Chicago", 
+            "America/Denver", 
+            "America/Los_Angeles", 
+            "America/Toronto", 
+            "America/Vancouver", 
+            "America/Phoenix",
+            "America/Anchorage",
+            "America/Halifax",
+            "America/Mexico_City", 
+            "America/Sao_Paulo", 
+            "America/Argentina/Buenos_Aires", 
+            # Europe
+            "Europe/London", 
+            "Europe/Berlin", 
+            "Europe/Paris", 
+            "Europe/Madrid", 
+            "Europe/Rome",
+            "Europe/Athens", 
+            "Europe/Moscow", 
+            "Europe/Amsterdam", 
+            "Europe/Zurich", 
+            "Europe/Stockholm", 
+            "Europe/Dublin", 
+            # Asia
+            "Asia/Dubai", 
+            "Asia/Tokyo", 
+            "Asia/Shanghai", 
+            "Asia/Singapore", 
+            "Asia/Kolkata", 
+            "Asia/Seoul", 
+            "Asia/Bangkok", 
+            "Asia/Manila", 
+            "Asia/Hong_Kong", 
+            "Asia/Jakarta", 
+            "Asia/Karachi", 
+            "Asia/Tehran", 
+            "Asia/Beirut", 
+            "Asia/Riyadh", 
+            "Asia/Kathmandu", 
+            # Oceania
+            "Australia/Sydney", 
+            "Australia/Melbourne", 
+            "Australia/Brisbane", 
+            "Australia/Perth", 
+            "Pacific/Auckland", 
+            "Pacific/Fiji", 
+            "Pacific/Tahiti",
+            # Pacific Islands
+            "Pacific/Honolulu", 
+            "Pacific/Guam", 
+            "Pacific/Samoa", 
+            # Africa
+            "Africa/Johannesburg", 
+            "Africa/Nairobi", 
+            "Africa/Cairo", 
+            "Africa/Lagos", 
+            "Africa/Accra", 
+            "Africa/Algiers", 
+            "Africa/Casablanca", 
+            # Middle East
+            "Asia/Jerusalem",
+            "Asia/Baghdad", 
+            "Asia/Istanbul",
+            # Additional timezones
+            "Asia/Almaty", 
+            "Asia/Manila", 
+            "Asia/Colombo", 
+            "Asia/Karachi", 
+            "Asia/Kathmandu", 
+            "Africa/Abidjan", 
+            "Africa/Porto-Novo", 
+            "Europe/Prague", 
+            "Europe/Oslo", 
+            "Europe/Warsaw", 
+            "Europe/Sofia", 
+            "Europe/Belgrade", 
+            "Europe/Zagreb",
+            "Europe/Chisinau", 
+            "Europe/Skopje",
+            "Europe/Tirane",
+            "Pacific/Apia", 
+            "Pacific/Pago_Pago", 
+            "Pacific/Majuro",
+            "Pacific/Nauru", 
+            "Pacific/Wallis", 
+            "Pacific/Efate"
+        ])
+        self.timezone_dropdown.setStyleSheet("""
+                border-radius: 7px;
+                border: 2px solid #808080;
+        """)
+        layout.addWidget(self.timezone_dropdown)
 
         # Buttons
         self.start_button = QtWidgets.QPushButton('Start Monitoring', self)
@@ -183,12 +308,9 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         with open(filepath, 'w') as file:
             json.dump(data, file, indent=4)
 
-    def get_current_time(self):
-        """Get the current time in the specified timezone (12-hour format)."""
-        return datetime.now(TIMEZONE).strftime('%m/%d/%Y %I:%M:%S %p')
-
     async def send_discord_notification(self, embed: dict):
         """Send a notification to the Discord webhook."""
+        AVATAR_URL = self.image_url.text()
         payload = {
             "embeds": [embed],
             "username": "Roblox Transaction Info",
@@ -203,15 +325,25 @@ class RobloxMonitorApp(QtWidgets.QWidget):
             except aiohttp.ClientError as e:
                 print(f"Error sending Discord notification: {e}")
 
+    def get_current_time(self, timezone=None):
+        """Get the current time in the specified timezone (12-hour format)."""
+        # Use the provided timezone or default to the application's timezone
+        tz = timezone or self.get_selected_timezone()
+        return datetime.now(tz).strftime('%m/%d/%Y %I:%M:%S %p')
+
     async def send_discord_notification_for_changes(self, title: str, description: str, changes: dict, footer: str):
         """Send a notification for changes detected in transaction data."""
         fields = [{"name": key, "value": f"**{old}** → **{new}**", "inline": False} for key, (old, new) in changes.items()]
+        
+        # Get the current time in the selected timezone
+        current_time_in_timezone = self.get_current_time(self.get_selected_timezone())
+
         embed = {
             "title": title,
             "description": description,
             "fields": fields,
             "color": 720640,
-            "footer": {"text": footer}
+            "footer": {"text": f"{footer} Timezone: {self.get_selected_timezone().zone} | Time: {current_time_in_timezone}"}
         }
         await self.send_discord_notification(embed)
 
@@ -237,6 +369,11 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         """Fetch the current Robux balance."""
         response = await self.fetch_data(self.currency_api_url)
         return response.get("robux", 0) if response else 0
+
+    def get_selected_timezone(self):
+        """Get the selected timezone from the dropdown."""
+        selected_timezone = self.timezone_dropdown.currentText()
+        return pytz.timezone(selected_timezone)
 
     async def monitor(self):
         """Monitor Roblox transaction and Robux data for changes."""
@@ -264,7 +401,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
                             "\U0001F514 Roblox Transaction Data Changed!",
                             f"Changes detected at {self.get_current_time()}",
                             changes,
-                            f"Timestamp: {self.get_current_time()}"
+                            "Fetched From Roblox's API"
                         )
                         self.last_transaction_data.update(current_transaction_data)
                         self.save_json_data(TRANSACTION_DATA_PATH, self.last_transaction_data)
@@ -455,7 +592,7 @@ class LoginWindow(QtWidgets.QWidget):
 
     def authenticate(self, username, password):
         # Replace with actual authentication logic
-        return username == "admin" and password == "password"
+        return username == "anything" and password == "anything"
 
     def handle_login(self):
         username = self.username_input.text()
@@ -463,10 +600,11 @@ class LoginWindow(QtWidgets.QWidget):
 
         if self.authenticate(username, password):
             self.status_label.setText("Login successful!")
-            self.close()
+            time.sleep(1)
             self.launch_main_app()
+            self.close()
         else:
-            self.status_label.setText("Invalid credentials. Please try again.")
+            self.status_label.setText("Invalid username or a password. Please try again.")
 
 def create_splash_screen():
     """Create and return a styled splash screen with animated loading dots."""
@@ -547,7 +685,7 @@ def show_splash_screen(app):
     for i in range(101):
         app.processEvents()
         progress_bar.setValue(i)
-        QtCore.QThread.msleep(69)  # Control the speed of progress bar update
+        QtCore.QThread.msleep(60)  # Control the speed of progress bar update
 
         # Update the loading message with dynamic dots every 2% progress
         if i % 2 == 0:
@@ -555,12 +693,14 @@ def show_splash_screen(app):
 
     # Stop the timer once the splash screen is finished
     timer.stop()
-    
     splash_widget.close()
 
-if __name__ == "__main__":
-    app = QtWidgets.QApplication([])
+def main():
+    app = QtWidgets.QApplication(sys.argv)
     show_splash_screen(app)
     login_window = LoginWindow()
     login_window.show()
     app.exec_()
+
+if __name__ == "__main__":
+    main()
