@@ -30,15 +30,15 @@ TRANSACTION_API_URL = ""
 CURRENCY_API_URL = ""
 
 # ICON URLS
-# https://img.icons8.com/plasticine/2x/robux.png
 icon_url = "https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/Robux.png"
-background_image = ""
 AVATAR_URL = "" # Custom icon for Discord notification
 
-VERSION = "V0.6.6"
+VERSION = "V0.6.8"
 
 SETUSERNAME = "anything"
 SETPASSWORD = "anything2"
+
+system = platform.system()
 
 UPDATEEVERY = 60  # Monitor interval
 
@@ -63,7 +63,6 @@ def set_hidden_attribute(path):
         show_popup(f"The specified path does not exist: {path}")
         raise FileNotFoundError(f"The specified path does not exist: {path}")
 
-    system = platform.system()
     try:
         if system == "Windows":
             # Use the `attrib` command to set the hidden attribute
@@ -85,7 +84,7 @@ def ensure_hidden_directory_exists(directory):
         show_popup(f"Error creating hidden directory: {e}")
         raise RuntimeError(f"Error creating hidden directory: {e}")
 
-if platform.system() == "Windows":
+if system == "Windows":
     appdata_dir = os.path.join(home_dir, "AppData", "Roaming", "HiddenRobux")
     ensure_hidden_directory_exists(appdata_dir)
 else:
@@ -392,6 +391,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
             "color": 720640,
             "footer": {"text": f"{footer} | Timezone: {self.get_selected_timezone().zone} | Time: {current_time_in_timezone}"}
         }
+        
         await self.send_discord_notification(embed, avatar_url)
 
     async def fetch_data(self, url: str):
@@ -518,11 +518,6 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         # Start async monitoring with delay
         self._start_async_monitoring_with_delay()
 
-    async def delay_monitor_start(self, delay_seconds: int):
-        """Adds a delay before starting monitoring."""
-        print(f"Delaying start for {delay_seconds} seconds...")
-        await asyncio.sleep(delay_seconds)  # Non-blocking delay
-
     def _start_async_monitoring_with_delay(self):
         """Initialize and start the async loop for monitoring with a delay."""
         try:
@@ -611,7 +606,6 @@ class LoginWindow(QtWidgets.QWidget):
 
         if self.authenticate(username, password):
             self.status_label.setText("Login successful!")
-            time.sleep(1)
             self.launch_main_app()
             self.close()
         else:
@@ -626,29 +620,29 @@ def create_window():
     x_coordinate = (screen_width / 2) - (width_of_window / 2)
     y_coordinate = (screen_height / 2) - (height_of_window / 2)
     w.geometry("%dx%d+%d+%d" % (width_of_window, height_of_window, x_coordinate, y_coordinate))
-    w.overrideredirect(1)  # for hiding titlebar
+    w.overrideredirect(1) # for hiding titlebar
 
     # Set app icon
-    icon_path = download_icon()  # Download the image
+    icon_path = download_icon() # Download the image
     img = ImageTk.PhotoImage(Image.open(icon_path))
     w.iconphoto(False, img)
     return w
 
 def create_labels(w):
     Frame(w, width=427, height=250, bg='#272727').place(x=0, y=0)
-    label1 = Label(w, text='Robux Info Monitor', fg='white', bg='#272727')
+    label1 = Label(w, text='Robux Monitor', fg='white', bg='#272727')
     label1.configure(font=("Game Of Squids", 24, "bold"))
     label1.place(relx=0.5, rely=0.3, anchor=CENTER)  # Center the label
 
     label2 = Label(w, text='Loading...', fg='white', bg='#272727')
-    label2.configure(font=("Fredoka", 11))
+    label2.configure(font=("Game Of Squids", 11))
     label2.place(x=10, y=215)
 
 def animate(w, image_a, image_b):
     positions = [(180, 145), (200, 145), (220, 145), (240, 145)]
     forthrange = 4
     
-    for _ in range(2):  # 2 loops to last around 5 seconds
+    for _ in range(2): # 2 loops to last around 5 seconds
         for i in range(forthrange):
             for j in range(forthrange):
                 img = image_a if i == j else image_b
@@ -660,22 +654,24 @@ def show_splash_screen():
     w = create_window()
     create_labels(w)
 
-    image_a_url = 'https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/c1.png'
-    image_b_url = 'https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/c2.png'
+    image_urls = [
+        'https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/c1.png',
+        'https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/c2.png'
+    ]
     
-    image_a_path = os.path.join(appdata_dir, 'c1.png')
-    image_b_path = os.path.join(appdata_dir, 'c2.png')
+    image_paths = [
+        os.path.join(appdata_dir, 'c1.png'),
+        os.path.join(appdata_dir, 'c2.png')
+    ]
     
-    if not os.path.exists(image_a_path):
-        urllib.request.urlretrieve(image_a_url, image_a_path)
-    if not os.path.exists(image_b_path):
-        urllib.request.urlretrieve(image_b_url, image_b_path)
+    for url, path in zip(image_urls, image_paths):
+        if not os.path.exists(path):
+            urllib.request.urlretrieve(url, path)
     
-    image_a = ImageTk.PhotoImage(Image.open(image_a_path))
-    image_b = ImageTk.PhotoImage(Image.open(image_b_path))
+    images = [ImageTk.PhotoImage(Image.open(path)) for path in image_paths]
 
-    animate(w, image_a, image_b)
-    w.destroy()  # Close the Tkinter window after animation
+    animate(w, images[0], images[1])
+    w.destroy() # Close the Tkinter window after animation
 
 def main():
     show_splash_screen()
