@@ -50,9 +50,9 @@ home_dir = os.path.expanduser("~")
 
 def show_popup(message, title="Error"):
     """Display a custom popup with the specified message using PyQt5."""
-    app = QApplication([])
+    app = QApplication([])  # Initializes the application
     msg_box = QMessageBox()
-    msg_box.setIcon(QMessageBox.Critical)
+    msg_box.setIcon(QMessageBox.Information)  # Change the icon if desired
     msg_box.setWindowTitle(title)
     msg_box.setText(message)
     msg_box.exec_()
@@ -674,6 +674,8 @@ def show_splash_screen():
     w.destroy() # Close the Tkinter window after animation
 
 def main():
+    # Show a popup when the app is started
+    show_popup("Just a quick note if the api is having issue or not sending webhooks that could be roblox's end or it could be that we published somthing thats buggy", title="NOTE")
     show_splash_screen()
     app = QtWidgets.QApplication(sys.argv)
     login_window = LoginWindow()
