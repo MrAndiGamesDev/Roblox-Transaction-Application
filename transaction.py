@@ -639,8 +639,8 @@ def create_window():
 
 def create_labels(w):
     Frame(w, width=427, height=250, bg='#272727').place(x=0, y=0)
-    label1 = Label(w, text='Roblox Transaction Monitor', fg='white', bg='#272727')
-    label1.configure(font=("Monsterrat", 24, "bold"))
+    label1 = Label(w, text='Robux Info Monitor', fg='white', bg='#272727')
+    label1.configure(font=("Game Of Squids", 24, "bold"))
     label1.place(relx=0.5, rely=0.4, anchor=CENTER)  # Center the label
 
     label2 = Label(w, text='Loading...', fg='white', bg='#272727')
@@ -657,13 +657,27 @@ def animate(w, image_a, image_b):
             w.update_idletasks()
             time.sleep(0.5)
 
-def main():
+def show_splash_screen():
     w = create_window()
     create_labels(w)
-    image_a = ImageTk.PhotoImage(Image.open('assets/c1.png'))
-    image_b = ImageTk.PhotoImage(Image.open('assets/c2.png'))
+    image_a_url = 'https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/c1.png'
+    image_b_url = 'https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/c2.png'
+    
+    image_a_path = os.path.join(appdata_dir, 'c1.png')
+    image_b_path = os.path.join(appdata_dir, 'c2.png')
+    
+    if not os.path.exists(image_a_path):
+        urllib.request.urlretrieve(image_a_url, image_a_path)
+    if not os.path.exists(image_b_path):
+        urllib.request.urlretrieve(image_b_url, image_b_path)
+    
+    image_a = ImageTk.PhotoImage(Image.open(image_a_path))
+    image_b = ImageTk.PhotoImage(Image.open(image_b_path))
     animate(w, image_a, image_b)
     w.destroy()  # Close the Tkinter window after animation
+
+def main():
+    show_splash_screen()
     app = QtWidgets.QApplication(sys.argv)
     login_window = LoginWindow()
     login_window.show()
