@@ -8,6 +8,9 @@ import subprocess
 import urllib.request
 import sys
 import time
+from tkinter import *
+from tkinter import font
+from PIL import ImageTk, Image 
 from datetime import datetime
 from dotenv import load_dotenv
 from PyQt5.QtCore import QTimer, Qt
@@ -30,11 +33,15 @@ hidden_dir = ".resources"
 Supported = "Windows"
 
 # ICON URLS
+# https://img.icons8.com/plasticine/2x/robux.png
 icon_url = "https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/Robux.png"
 background_image = ""
 AVATAR_URL = "" # Custom icon for Discord notification
 
-VERSION = "V0.6.3"
+VERSION = "V0.6.6"
+
+SETUSERNAME = "anything"
+SETPASSWORD = "anything2"
 
 UPDATEEVERY = 60  # Monitor interval
 
@@ -43,8 +50,6 @@ shutdown_flag = False  # Graceful shutdown flag
 
 # Define the hidden directory path based on the operating system
 home_dir = os.path.expanduser("~")
-
-# https://img.icons8.com/plasticine/2x/robux.png
 
 def show_popup(message, title="Error"):
     """Display a custom popup with the specified message using PyQt5."""
@@ -73,33 +78,30 @@ def set_hidden_attribute(path):
         show_popup(f"An error occurred while setting the hidden attribute: {e}")
         raise RuntimeError(f"An error occurred while setting the hidden attribute: {e}")
 
+def ensure_hidden_directory_exists(directory):
+    """Ensure the hidden directory exists and set its attribute."""
+    try:
+        if not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
+            set_hidden_attribute(directory)
+    except Exception as e:
+        show_popup(f"Error creating hidden directory: {e}")
+        raise RuntimeError(f"Error creating hidden directory: {e}")
+
 if platform.system() == Supported:
     appdata_dir = os.path.join(home_dir, "AppData", "Roaming", "HiddenRobux")
-    
-    # Example usage
-    try:
-        os.makedirs(appdata_dir, exist_ok=True)  # Ensure the directory exists
-        set_hidden_attribute(appdata_dir)
-    except Exception as e:
-        print(f"Error: {e}")
+    ensure_hidden_directory_exists(appdata_dir)
 else:
     show_popup("Unsupported operating system")
 
 def download_icon():
     """Download the icon to the AppData directory and set it hidden."""
     icon_path = os.path.join(appdata_dir, "robux_icon.png")
-    
-    # Ensure the hidden directory exists
-    os.makedirs(appdata_dir, exist_ok=True)
-
-    # Set the hidden attribute for the directory
-    set_hidden_attribute(appdata_dir)
+    ensure_hidden_directory_exists(appdata_dir)
 
     # Check if the icon already exists
     if not os.path.exists(icon_path):
         urllib.request.urlretrieve(icon_url, icon_path)
-
-        # Set the hidden attribute for the file
         set_hidden_attribute(icon_path)
 
     return icon_path
@@ -107,11 +109,7 @@ def download_icon():
 def get_hidden_file_path(filename):
     """Return the path for a hidden file in the AppData directory."""
     hidden_file_path = os.path.join(appdata_dir, filename)
-    
-    # Ensure the hidden directory exists
-    os.makedirs(appdata_dir, exist_ok=True)
-    set_hidden_attribute(appdata_dir)
-
+    ensure_hidden_directory_exists(appdata_dir)
     return hidden_file_path
 
 # Modify paths for storing JSON files in hidden directory
@@ -327,7 +325,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
             "Credits:\n"
             "Komas19 (For Sending Me This Source Code)\n"
             "MrAndi Scripted (For Modifing The Source Code To Make An Gui Application)\n"
-            "Developed Using: Framework (PyQt5 for Python)\n"
+            "Developed Using: Frameworks (Written In Python)\n"
         )
         self.gui_logs.append(credits_text)
 
@@ -368,10 +366,11 @@ class RobloxMonitorApp(QtWidgets.QWidget):
     async def send_discord_notification(self, embed: dict, avatar_url: str = None):
         """Send a notification to the Discord webhook."""
         USERNAMES = self.discord_webhook_username_input.text()  # Assuming this is a GUI input element
+        IMAGE_URL = self.image_url.text()  # Assuming this is a GUI input element
         payload = {
             "embeds": [embed],
             "username": USERNAMES,
-            "avatar_url": self.image_url.text()
+            "avatar_url": IMAGE_URL
         }
 
         async with aiohttp.ClientSession() as session:
@@ -550,43 +549,6 @@ async def delay_monitor_start(self, delay_seconds: int):
     print(f"Delaying start for {delay_seconds} seconds...")
     await asyncio.sleep(delay_seconds)  # Non-blocking delay
 
-class RotatingCircle(QtWidgets.QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.angle = 0  # Starting angle for the rotation
-        self.setFixedSize(100, 100)  # Set a fixed size for the circle
-
-        # Create a timer to update the angle and trigger a repaint
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_angle)
-        self.timer.start(30)  # Update the angle every 30ms (adjust speed here)
-
-    def update_angle(self):
-        """Update the rotation angle."""
-        self.angle += 5  # Increment angle by 5 degrees
-        if self.angle >= 360:
-            self.angle = 0  # Reset the angle once it completes a full circle
-        self.update()  # Request a repaint
-
-    def paintEvent(self, event):
-        """Draw the rotating circle."""
-        painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)  # Smooth rendering
-        painter.setPen(QtCore.Qt.NoPen)  # No border for the circle
-        painter.setBrush(QtGui.QColor(0, 169, 224))  # Set the fill color (Roblox-like)
-
-        # Calculate the center and radius of the circle
-        center = self.rect().center()
-        radius = self.width() // 3  # Set the radius as a third of the widget size
-
-        # Rotate the painter around the center of the circle
-        painter.translate(center)
-        painter.rotate(self.angle)
-        painter.translate(-center)
-
-        # Draw the circle
-        painter.drawEllipse(center, radius, radius)
-
 class LoginWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
@@ -643,7 +605,8 @@ class LoginWindow(QtWidgets.QWidget):
 
     def authenticate(self, username, password):
         # Replace with actual authentication logic
-        return username == "anything" and password == "anything"
+        authentication = username == SETUSERNAME and password == SETPASSWORD
+        return authentication
 
     def handle_login(self):
         username = self.username_input.text()
@@ -657,98 +620,51 @@ class LoginWindow(QtWidgets.QWidget):
         else:
             self.status_label.setText("Invalid username or a password. Please try again.")
 
-def create_splash_screen():
-    """Create and return a styled splash screen with animated loading dots."""
-    background_color = QtGui.QColor("#000000")  # Dark background similar to Roblox
-    splash_pix = QtGui.QPixmap(download_icon())  # Use the hidden icon file
-    splash_pix = splash_pix.scaled(150, 150, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+def create_window():
+    w = Tk()
+    width_of_window = 427
+    height_of_window = 250
+    screen_width = w.winfo_screenwidth()
+    screen_height = w.winfo_screenheight()
+    x_coordinate = (screen_width / 2) - (width_of_window / 2)
+    y_coordinate = (screen_height / 2) - (height_of_window / 2)
+    w.geometry("%dx%d+%d+%d" % (width_of_window, height_of_window, x_coordinate, y_coordinate))
+    w.overrideredirect(1)  # for hiding titlebar
 
-    # Create main splash window widget
-    splash_widget = QtWidgets.QWidget()
-    splash_widget.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
-    splash_widget.setFixedSize(400, 300)  # Smaller, more compact size
-    splash_widget.setStyleSheet(f"background-color: {background_color.name()}")
+    # Set app icon
+    icon_path = download_icon()  # Download the image
+    img = ImageTk.PhotoImage(Image.open(icon_path))
+    w.iconphoto(False, img)
+    return w
 
-    # Layout setup
-    layout = QtWidgets.QVBoxLayout()
-    layout.setContentsMargins(0, 0, 0, 0)
-    layout.setSpacing(15)
+def create_labels(w):
+    Frame(w, width=427, height=250, bg='#272727').place(x=0, y=0)
+    label1 = Label(w, text='Roblox Transaction Monitor', fg='white', bg='#272727')
+    label1.configure(font=("Monsterrat", 24, "bold"))
+    label1.place(relx=0.5, rely=0.4, anchor=CENTER)  # Center the label
 
-    # Logo with smooth scaling
-    logo_label = QtWidgets.QLabel()
-    logo_label.setPixmap(splash_pix)
-    logo_label.setAlignment(QtCore.Qt.AlignCenter)
-    layout.addWidget(logo_label)
+    label2 = Label(w, text='Loading...', fg='white', bg='#272727')
+    label2.configure(font=("Fredoka", 11))
+    label2.place(x=10, y=215)
 
-    # Create progress bar with subtle animation and modern look
-    progress_bar = QtWidgets.QProgressBar()
-    progress_bar.setRange(0, 100)
-    progress_bar.setTextVisible(False)
-    progress_bar.setStyleSheet("""
-        QProgressBar {
-            border: none;
-            background: #333333;
-            height: 5px;
-        }
-        QProgressBar::chunk {
-            background: #00A9E0;  /* Roblox-inspired color */
-            width: 10px;
-        }
-    """)
-    layout.addWidget(progress_bar)
-
-    # Loading message with modern font style
-    loading_message = QtWidgets.QLabel("Initializing Roblox Monitor...")
-    loading_message.setAlignment(QtCore.Qt.AlignCenter)
-    loading_message.setStyleSheet("color: white; font-size: 16px; font-family: 'Segoe UI', sans-serif;")
-    layout.addWidget(loading_message)
-
-    # Set the layout for the splash widget
-    splash_widget.setLayout(layout)
-
-    return splash_widget, progress_bar, loading_message
-
-def animate_loading_dots(loading_message):
-    """Animate loading dots for the loading message."""
-    dots = ""
-    def update_message():
-        nonlocal dots
-        dots = "." * (dots.count(".") % 3 + 1)
-        loading_message.setText(f"Initializing Roblox Monitor{dots}")
-    
-    # Set up a timer to update the loading message
-    timer = QTimer()
-    timer.timeout.connect(update_message)
-    timer.start(1000)  # Update every 1000 milliseconds
-    
-    return timer
-
-def show_splash_screen(app):
-    """Show a splash screen with a Roblox-like loading bar, animated dots, and logo."""
-    splash_widget, progress_bar, loading_message = create_splash_screen()
-
-    splash_widget.show()
-
-    # Animate loading dots
-    timer = animate_loading_dots(loading_message)
-
-    # Simulate the loading process, updating the progress bar
-    for i in range(100):
-        app.processEvents()
-        progress_bar.setValue(i)
-        QtCore.QThread.msleep(60)  # Control the speed of progress bar update
-
-        # Update the loading message with dynamic dots every 2% progress
-        if i % 2 == 0:
-            loading_message.setText(f"Initializing Roblox Monitor{'...' * (i % 3 + 1)}")
-
-    # Stop the timer once the splash screen is finished
-    timer.stop()
-    splash_widget.close()
+def animate(w, image_a, image_b):
+    positions = [(180, 145), (200, 145), (220, 145), (240, 145)]
+    for _ in range(2):  # 2 loops to last around 5 seconds
+        for i in range(4):
+            for j in range(4):
+                img = image_a if i == j else image_b
+                Label(w, image=img, border=0, relief=SUNKEN).place(x=positions[j][0], y=positions[j][1])
+            w.update_idletasks()
+            time.sleep(0.5)
 
 def main():
+    w = create_window()
+    create_labels(w)
+    image_a = ImageTk.PhotoImage(Image.open('assets/c1.png'))
+    image_b = ImageTk.PhotoImage(Image.open('assets/c2.png'))
+    animate(w, image_a, image_b)
+    w.destroy()  # Close the Tkinter window after animation
     app = QtWidgets.QApplication(sys.argv)
-    show_splash_screen(app)
     login_window = LoginWindow()
     login_window.show()
     app.exec_()
