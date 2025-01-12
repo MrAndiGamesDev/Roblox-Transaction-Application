@@ -29,9 +29,6 @@ COOKIES = {}
 TRANSACTION_API_URL = ""
 CURRENCY_API_URL = ""
 
-hidden_dir = ".resources"
-Supported = "Windows"
-
 # ICON URLS
 # https://img.icons8.com/plasticine/2x/robux.png
 icon_url = "https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/Robux.png"
@@ -68,7 +65,7 @@ def set_hidden_attribute(path):
 
     system = platform.system()
     try:
-        if system == Supported:
+        if system == "Windows":
             # Use the `attrib` command to set the hidden attribute
             subprocess.run(["attrib", "+H", path], check=True)
         else:
@@ -88,7 +85,7 @@ def ensure_hidden_directory_exists(directory):
         show_popup(f"Error creating hidden directory: {e}")
         raise RuntimeError(f"Error creating hidden directory: {e}")
 
-if platform.system() == Supported:
+if platform.system() == "Windows":
     appdata_dir = os.path.join(home_dir, "AppData", "Roaming", "HiddenRobux")
     ensure_hidden_directory_exists(appdata_dir)
 else:
@@ -641,7 +638,7 @@ def create_labels(w):
     Frame(w, width=427, height=250, bg='#272727').place(x=0, y=0)
     label1 = Label(w, text='Robux Info Monitor', fg='white', bg='#272727')
     label1.configure(font=("Game Of Squids", 24, "bold"))
-    label1.place(relx=0.5, rely=0.4, anchor=CENTER)  # Center the label
+    label1.place(relx=0.5, rely=0.3, anchor=CENTER)  # Center the label
 
     label2 = Label(w, text='Loading...', fg='white', bg='#272727')
     label2.configure(font=("Fredoka", 11))
@@ -649,9 +646,11 @@ def create_labels(w):
 
 def animate(w, image_a, image_b):
     positions = [(180, 145), (200, 145), (220, 145), (240, 145)]
+    forthrange = 4
+    
     for _ in range(2):  # 2 loops to last around 5 seconds
-        for i in range(4):
-            for j in range(4):
+        for i in range(forthrange):
+            for j in range(forthrange):
                 img = image_a if i == j else image_b
                 Label(w, image=img, border=0, relief=SUNKEN).place(x=positions[j][0], y=positions[j][1])
             w.update_idletasks()
@@ -660,6 +659,7 @@ def animate(w, image_a, image_b):
 def show_splash_screen():
     w = create_window()
     create_labels(w)
+
     image_a_url = 'https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/c1.png'
     image_b_url = 'https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/c2.png'
     
@@ -673,6 +673,7 @@ def show_splash_screen():
     
     image_a = ImageTk.PhotoImage(Image.open(image_a_path))
     image_b = ImageTk.PhotoImage(Image.open(image_b_path))
+
     animate(w, image_a, image_b)
     w.destroy()  # Close the Tkinter window after animation
 
