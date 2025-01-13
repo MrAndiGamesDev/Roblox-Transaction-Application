@@ -9,6 +9,7 @@ import urllib.request
 import sys
 import time
 from tkinter import *
+from tkinter import ttk
 from tkinter import font
 from PIL import ImageTk, Image 
 from datetime import datetime
@@ -33,10 +34,10 @@ CURRENCY_API_URL = ""
 icon_url = "https://raw.githubusercontent.com/MrAndiGamesDev/Roblox-Transaction-Application/refs/heads/main/Robux.png"
 AVATAR_URL = "" # Custom icon for Discord notification
 
-VERSION = "V0.6.8"
+VERSION = "V0.6.9"
 
-SETUSERNAME = "password"
-SETPASSWORD = "username"
+SETUSERNAME = "anything"
+SETPASSWORD = "anything"
 
 system = platform.system()
 
@@ -669,6 +670,15 @@ def show_splash_screen():
             urllib.request.urlretrieve(url, path)
     
     images = [ImageTk.PhotoImage(Image.open(path)) for path in image_paths]
+
+    # Add progress bar
+    progress = ttk.Progressbar(w, orient=HORIZONTAL, length=400, mode='determinate')
+    progress.place(relx=0.5, rely=0.8, anchor=CENTER)
+    
+    for i in range(100):
+        w.update_idletasks()
+        progress['value'] += 1
+        time.sleep(0.05) # Adjust the sleep time to control the speed of the progress bar
 
     animate(w, images[0], images[1])
     w.destroy() # Close the Tkinter window after animation
