@@ -41,19 +41,19 @@ SETPASSWORD = "anything"
 
 system = platform.system()
 
-UPDATEEVERY = 60  # Monitor interval
+UPDATEEVERY = 60 # Monitor interval
 
-TIMEZONE = pytz.timezone("America/New_York")  # Default timezone
-shutdown_flag = False  # Graceful shutdown flag
+TIMEZONE = pytz.timezone("America/New_York") # Default timezone
+shutdown_flag = False # Graceful shutdown flag
 
 # Define the hidden directory path based on the operating system
 home_dir = os.path.expanduser("~")
 
 def show_popup(message, title="Error"):
     """Display a custom popup with the specified message using PyQt5."""
-    app = QApplication([])  # Initializes the application
+    app = QApplication([]) # Initializes the application
     msg_box = QMessageBox()
-    msg_box.setIcon(QMessageBox.Information)  # Change the icon if desired
+    msg_box.setIcon(QMessageBox.Information) # Change the icon if desired
     msg_box.setWindowTitle(title)
     msg_box.setText(message)
     msg_box.exec_()
@@ -135,9 +135,9 @@ class RobloxMonitorApp(QtWidgets.QWidget):
         self.setFixedSize(600, 500)
 
         # Set app icon from GitHub image URL or local file
-        icon_path = download_icon()  # Download the image
-        app_icon = QtGui.QIcon(icon_path)  # Load the icon from the downloaded image
-        self.setWindowIcon(app_icon)  # Set the window icon
+        icon_path = download_icon() # Download the image
+        app_icon = QtGui.QIcon(icon_path) # Load the icon from the downloaded image
+        self.setWindowIcon(app_icon) # Set the window icon
 
         layout = QtWidgets.QVBoxLayout()
 
@@ -380,7 +380,10 @@ class RobloxMonitorApp(QtWidgets.QWidget):
 
     async def send_discord_notification_for_changes(self, title: str, description: str, changes: dict, footer: str, avatar_url: str):
         """Send a notification for changes detected in transaction data."""
-        fields = [{"name": key, "value": f"**{old}** → **{new}**", "inline": False} for key, (old, new) in changes.items()]
+        fields = []
+        for key, (old, new) in changes.items():
+            change_indicator = "+" if new > old else "-"
+            fields.append({"name": key, "value": f"**{old}** → **{new}** ({change_indicator}{abs(new - old)})", "inline": False})
         
         # Get the current time in the selected timezone
         current_time_in_timezone = self.get_current_time(self.get_selected_timezone())
@@ -421,7 +424,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
     async def monitor(self):
         """Monitor Roblox transaction and Robux data for changes."""
         iteration_count = 0
-        USER_ID = self.user_id_input.text()  # Replace with actual user ID for avatar
+        USER_ID = self.user_id_input.text() # Replace with actual user ID for avatar
         AVATAR_URL = await self.fetch_avatar_thumbnail(USER_ID)
 
         with alive_bar(title="Monitoring Roblox Data", spinner="dots_waves") as bar:
@@ -447,14 +450,14 @@ class RobloxMonitorApp(QtWidgets.QWidget):
                             f"Changes detected at {self.get_current_time()}",
                             changes,
                             "Fetched From Roblox's API",
-                            avatar_url=AVATAR_URL  # Adding the avatar to the notification
+                            avatar_url=AVATAR_URL # Adding the avatar to the notification
                         )
                         self.last_transaction_data.update(current_transaction_data)
                         self.save_json_data(TRANSACTION_DATA_PATH, self.last_transaction_data)
 
                 robux_change = current_robux_balance - self.last_robux_balance['robux']
                 if robux_change != 0:
-                    color = 0x00FF00 if robux_change > 0 else 0xFF0000  # Green for gain, Red for spent
+                    color = 0x00FF00 if robux_change > 0 else 0xFF0000 # Green for gain, Red for spent
                     change_type = "gained" if robux_change > 0 else "spent"
                     await self.send_discord_notification({
                         "title": "\U0001F4B8 Robux Balance Update",
@@ -466,7 +469,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
                         ],
                         "color": color,
                         "footer": {"text": f"Change detected at {self.get_current_time()}"},
-                        "thumbnail": {"url": AVATAR_URL},  # Add Roblox icon as a thumbnail
+                        "thumbnail": {"url": AVATAR_URL}, # Add Roblox icon as a thumbnail
                     })
                     self.last_robux_balance['robux'] = current_robux_balance
                     self.save_json_data(ROBUX_BALANCE_PATH, self.last_robux_balance)
@@ -478,7 +481,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
     async def delay_monitor_start(self, delay_seconds: int):
         """Adds a delay before starting monitoring."""
         print(f"Delaying start for {delay_seconds} seconds...")
-        await asyncio.sleep(delay_seconds)  # Non-blocking delay
+        await asyncio.sleep(delay_seconds) # Non-blocking delay
 
     def _start_async_monitoring_with_delay(self):
         """Initialize and start the async loop for monitoring with a delay."""
@@ -540,7 +543,7 @@ class RobloxMonitorApp(QtWidgets.QWidget):
 async def delay_monitor_start(self, delay_seconds: int):
     """Adds a delay before starting monitoring."""
     print(f"Delaying start for {delay_seconds} seconds...")
-    await asyncio.sleep(delay_seconds)  # Non-blocking delay
+    await asyncio.sleep(delay_seconds) # Non-blocking delay
 
 class LoginWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -549,9 +552,9 @@ class LoginWindow(QtWidgets.QWidget):
         self.setWindowTitle("Login to Roblox Monitor")
         self.setGeometry(100, 100, 400, 200)
 
-        icon_path = download_icon()  # Download the image
-        app_icon = QtGui.QIcon(icon_path)  # Load the icon from the downloaded image
-        self.setWindowIcon(app_icon)  # Set the window icon
+        icon_path = download_icon() # Download the image
+        app_icon = QtGui.QIcon(icon_path) # Load the icon from the downloaded image
+        self.setWindowIcon(app_icon) # Set the window icon
 
         # Create layout
         layout = QtWidgets.QVBoxLayout()
@@ -633,7 +636,7 @@ def create_labels(w):
     Frame(w, width=427, height=250, bg='#272727').place(x=0, y=0)
     label1 = Label(w, text='Robux Monitor', fg='white', bg='#272727')
     label1.configure(font=("Game Of Squids", 24, "bold"))
-    label1.place(relx=0.5, rely=0.3, anchor=CENTER)  # Center the label
+    label1.place(relx=0.5, rely=0.3, anchor=CENTER) # Center the label
 
     label2 = Label(w, text='Loading...', fg='white', bg='#272727')
     label2.configure(font=("Game Of Squids", 11))
