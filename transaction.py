@@ -673,9 +673,28 @@ def show_splash_screen():
     animate(w, images[0], images[1])
     w.destroy() # Close the Tkinter window after animation
 
+def check_for_updates():
+    """Check for updates and notify the user if a new version is available."""
+    current_version = VERSION
+    update_url = "https://api.github.com/repos/MrAndiGamesDev/Roblox-Transaction-Application/releases/latest"
+
+    try:
+        with urllib.request.urlopen(update_url) as response:
+            data = json.loads(response.read().decode())
+            latest_version = data["tag_name"]
+
+            if latest_version != current_version:
+                show_popup(f"A new version ({latest_version}) is available. Please update your application.", title="Update Available")
+            else:
+                print("You are using the latest version.")
+    except Exception as e:
+        print(f"Failed to check for updates: {e}")
+
 def main():
     # Show a popup when the app is started
     show_popup("Just a quick note if the api is having issue or not sending webhooks that could be roblox's end or it could be that we published somthing thats buggy", title="NOTE")
+        # Call the update check function
+    check_for_updates()
     show_splash_screen()
     app = QtWidgets.QApplication(sys.argv)
     login_window = LoginWindow()
