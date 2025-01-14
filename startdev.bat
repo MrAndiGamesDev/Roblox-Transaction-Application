@@ -24,7 +24,7 @@ if "!all_installed!"=="true" (
 REM Wait for 3 seconds before checking if the Python script exists
 timeout /t 3 /nobreak >nul
 
-call :run_scripts transactiondev.py
+call :run_scripts main.py
 
 REM Log the completion of the script
 echo !OK! Script execution completed at %date% %time%
